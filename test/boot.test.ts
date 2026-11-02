@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import vm from 'node:vm';
-import { BOOT_CONFIG, CHANGE_EVENT, STORAGE_KEY, bootScript } from '../src/boot.js';
+import { CHANGE_EVENT, STORAGE_KEY, bootScript } from '../src/boot.js';
+import { THEME_IDS } from '../src/themes.js';
 
 type Listener = (e: { key?: string | null; detail?: unknown }) => void;
 
@@ -145,8 +146,11 @@ test('running twice registers listeners once', () => {
   assert.equal(f.listenerCount(CHANGE_EVENT), 1);
 });
 
-test('the inline script embeds every catalogue id and the shared key', () => {
-  for (const id of BOOT_CONFIG.ids) assert.ok(bootScript.includes(JSON.stringify(id)), id);
-  assert.ok(bootScript.includes(JSON.stringify(STORAGE_KEY)));
+test('the inline script applies every catalogue id stored under the shared key', () => {
+  for (const id of THEME_IDS) {
+    const f = fakeWindow({ stored: id });
+    boot(f);
+    assert.equal(f.theme(), id);
+  }
   assert.equal(STORAGE_KEY, 'site-theme');
 });

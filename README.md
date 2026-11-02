@@ -83,11 +83,15 @@ This writes `"site-themes": "github:akshayDev17/site-themes#v0.1.0"` into the ap
 // app/layout.tsx
 import 'site-themes/themes.css';          // before the app's own CSS
 import './globals.css';
+import { IBM_Plex_Mono, Newsreader } from 'next/font/google';
 import { bootScript } from 'site-themes';
+
+const newsreader = Newsreader({ subsets: ['latin'], variable: '--font-newsreader' });
+const plexMono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-plex-mono' });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={`${newsreader.variable} ${plexMono.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: bootScript }} />
       </head>
@@ -102,6 +106,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 import { ThemePicker } from 'site-themes/react';
 <ThemePicker hideLabel />
 ```
+
+The next/font `.variable` classes (`--font-newsreader` and `--font-plex-mono`) must go on `<html>`, not `<body>`. `--font-serif` and `--font-mono` are declared on `:root` and `[data-theme]`, which is `<html>`, and their `var()` resolves there. On `<body>` the variables are undefined at `<html>`, so the fonts silently fall back to Georgia and ui-monospace.
 
 `suppressHydrationWarning` is needed because the boot script sets `data-theme` on `<html>` before React hydrates. The picker draws into its shadow root, so hydration never sees its children.
 
