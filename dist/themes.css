@@ -24,32 +24,6 @@
   --font-mono: var(--font-plex-mono, "IBM Plex Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    color-scheme: dark;
-    --surface: #0F1220;
-    --surface-2: #171B2B;
-    --card: #1B2032;
-    --text: #EEF1F8;
-    --text-body: #D3D9E6;
-    --text-muted: #A3ABBE;
-    --line: #2A3045;
-    --line-strong: #3B4360;
-    --card-line: #6E7894;
-    --card-line-hover: #8E97B0;
-    --accent: #8E9BFF;
-    --focus: #EEF1F8;
-    --danger: #FF8A95;
-    --warn: #E3A857;
-    --ok: #5BC28C;
-    --shadow-rest: 0 1px 2px rgb(0 0 0 / .35), 0 8px 20px -14px rgb(0 0 0 / .6);
-    --shadow-hover: 0 2px 4px rgb(0 0 0 / .4), 0 20px 40px -20px rgb(0 0 0 / .7);
-    --radius-card: .7rem;
-    --font-serif: var(--font-newsreader, "Newsreader"), ui-serif, Georgia, serif;
-    --font-mono: var(--font-plex-mono, "IBM Plex Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-}
-
 [data-theme="classic-light"] {
   color-scheme: light;
   --surface: #EEF1F8;

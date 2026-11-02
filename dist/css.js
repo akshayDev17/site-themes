@@ -27,9 +27,9 @@ export function themeDeclarations(theme) {
         decls.push(['--font-serif', theme.font.serif], ['--font-mono', theme.font.mono]);
     return decls;
 }
-function block(selector, theme, indent = '') {
+function block(selector, theme) {
     const body = [`color-scheme: ${theme.scheme};`, ...themeDeclarations(theme).map(([k, v]) => `${k}: ${v};`)];
-    return `${indent}${selector} {\n${body.map((l) => `${indent}  ${l}`).join('\n')}\n${indent}}`;
+    return `${selector} {\n${body.map((l) => `  ${l}`).join('\n')}\n}`;
 }
 function byId(themes, id) {
     const theme = themes.find((t) => t.id === id);
@@ -37,11 +37,7 @@ function byId(themes, id) {
         throw new Error(`theme not in catalogue: ${id}`);
     return theme;
 }
-/**
- * One `[data-theme="<id>"]` block per theme. The base theme also sits on
- * `:root`, and the System dark theme applies when no `data-theme` is set and
- * the OS prefers dark (covers pages whose boot script did not run).
- */
+/** One `[data-theme="<id>"]` block per theme. The base theme also sits on `:root`. */
 export function generateCss(themes) {
     const ids = new Set();
     for (const t of themes) {
@@ -54,12 +50,11 @@ export function generateCss(themes) {
     if (!base.shadow || !base.radius || !base.font) {
         throw new Error(`${BASE_THEME_ID} must define shadow, radius and font: other themes inherit them`);
     }
-    const systemDark = byId(themes, SYSTEM_THEMES.dark);
+    byId(themes, SYSTEM_THEMES.dark);
     byId(themes, SYSTEM_THEMES.light);
     const parts = [
         '/* Generated from src/themes.ts by scripts/generate.ts. Do not edit by hand. */',
         block(':root', base),
-        `@media (prefers-color-scheme: dark) {\n${block(':root:not([data-theme])', systemDark, '  ')}\n}`,
         ...themes.map((t) => block(`[data-theme="${t.id}"]`, t)),
     ];
     return parts.join('\n\n') + '\n';

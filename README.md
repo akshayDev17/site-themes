@@ -8,14 +8,12 @@ Build-time shared themes for the akshayprabhakant.com apps (homepage, chat archi
 
 | Import | What it is |
 |---|---|
-| `site-themes/themes.css` | Generated CSS: Classic Light on `:root`, then one `[data-theme="<id>"]` block per theme, each setting `color-scheme`. A page with no `data-theme` whose OS prefers dark gets Classic Dark. |
-| `site-themes` (or `site-themes/themes`) | The catalogue: `THEMES`, `THEME_IDS`, `SYSTEM_THEMES`, `themeCatalogue()`, plus the TypeScript types. |
-| `bootScript` from `site-themes` (or `site-themes/boot`) | The inline head script as a string. It sets `<html data-theme>` before first paint. |
-| `site-themes/site-theme-boot.js` | The same script as a plain file, for a classic blocking `<script src>`. |
+| `site-themes/themes.css` | Generated CSS: Classic Light on `:root`, then one `[data-theme="<id>"]` block per theme, each setting `color-scheme`. |
+| `site-themes` (or `site-themes/themes`) | The catalogue: `THEMES`, `THEME_IDS`, `SYSTEM_THEMES`, plus the TypeScript types. |
+| `bootScript` from `site-themes` (or `site-themes/boot`) | The inline head script as a string. Each app inlines it into its own `<head>`, where it sets `<html data-theme>` before first paint. |
 | `defineThemePicker()` from `site-themes` (or `site-themes/picker`) | Registers the `<site-theme-picker>` custom element. It has no framework dependency. |
 | `ThemePicker` from `site-themes/react` | A thin React wrapper around the element (`'use client'`). |
 | `setThemeChoice()`, `readThemeChoice()` | For an app that wants its own toggle UI instead of the picker. |
-| `site-themes/catalogue.json` | `[{ id, label, scheme, swatches }]` for non-JS tooling. |
 
 ## Themes
 
@@ -77,7 +75,7 @@ npm install github:akshayDev17/site-themes#v0.1.0
 
 This writes `"site-themes": "github:akshayDev17/site-themes#v0.1.0"` into the app's `package.json`.
 
-**Built output is committed.** `dist/` (JS, `.d.ts`, `themes.css`, `site-theme-boot.js` and `catalogue.json`) is checked in, and the package has no `prepare` or `install` script. A git install therefore copies ready files with no build step, and no TypeScript runs on the app side. CI fails any PR whose committed `dist/` does not match a fresh build.
+**Built output is committed.** `dist/` (JS, `.d.ts` and `themes.css`) is checked in, and the package has no `prepare` or `install` script. A git install therefore copies ready files with no build step, and no TypeScript runs on the app side. CI fails any PR whose committed `dist/` does not match a fresh build.
 
 ## Wiring a Next.js app (static export)
 
@@ -109,11 +107,21 @@ import { ThemePicker } from 'site-themes/react';
 
 ## Wiring a plain static page (homepage)
 
-Copy `node_modules/site-themes/dist/` into the site's own assets, for example in the site's build step, then:
+The boot script must be inline in `<head>`, never a `<script src>`: the theme is set before first paint with no request. In the site's build step, write the exported `bootScript` text into the page and copy `node_modules/site-themes/dist/` into the site's own assets:
+
+```js
+// build step (Node)
+import { cpSync, readFileSync, writeFileSync } from 'node:fs';
+import { bootScript } from 'site-themes';
+
+cpSync('node_modules/site-themes/dist', 'out/assets/site-themes', { recursive: true });
+const html = readFileSync('src/index.html', 'utf8');
+writeFileSync('out/index.html', html.replace('<!-- site-theme-boot -->', `<script>${bootScript}</script>`));
+```
 
 ```html
 <head>
-  <script src="/assets/site-themes/site-theme-boot.js"></script>   <!-- classic, blocking, first in <head> -->
+  <!-- site-theme-boot -->   <!-- replaced by the inline boot script; keep it first in <head> -->
   <link rel="stylesheet" href="/assets/site-themes/themes.css">
 </head>
 <body>
@@ -146,7 +154,7 @@ CI computes WCAG contrast for every theme and fails below the thresholds in repo
 | cardLine | surface, card | 3:1 |
 | focus | surface, surface2, card | 3:1 |
 
-A card's border separates the card from the page it sits on, so `cardLine` is measured against `surface` and `card`. `line` and `lineStrong` are decorative dividers and exempt. Run the gate locally with `npm run check:contrast`. It prints every pair.
+A card's border separates the card from the page it sits on, so `cardLine` is gated against `surface` and `card` only, not `surface2`. A card or control bordered with `--card-line` that sits on `surface2` must carry a `--card` background. The picker's `<select>` always does. `line` and `lineStrong` are decorative dividers and exempt. Run the gate locally with `npm run check:contrast`. It prints every pair.
 
 ## Adding a theme
 

@@ -186,12 +186,3 @@ export const SYSTEM_THEMES = { light: 'classic-light', dark: 'classic-dark' } as
 
 export const THEME_IDS: readonly string[] = THEMES.map((t) => t.id);
 
-/** Small summary for pickers and docs: id, label, scheme and a few swatches. */
-export function themeCatalogue(themes: readonly Theme[] = THEMES) {
-  return themes.map((t) => ({
-    id: t.id,
-    label: t.label,
-    scheme: t.scheme,
-    swatches: [t.color.surface, t.color.card, t.color.text, t.color.accent],
-  }));
-}

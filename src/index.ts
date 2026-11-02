@@ -4,7 +4,6 @@ export {
   BASE_THEME_ID,
   SYSTEM_THEMES,
   VETTED_FONTS,
-  themeCatalogue,
   type Theme,
   type ThemeColors,
   type ThemeFonts,

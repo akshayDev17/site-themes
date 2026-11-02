@@ -17,8 +17,6 @@
     "./react": { "types": "./dist/react.d.ts", "default": "./dist/react.js" },
     "./themes": { "types": "./dist/themes.d.ts", "default": "./dist/themes.js" },
     "./themes.css": "./dist/themes.css",
-    "./site-theme-boot.js": "./dist/site-theme-boot.js",
-    "./catalogue.json": "./dist/catalogue.json",
     "./package.json": "./package.json"
   },
   "scripts": {

@@ -138,12 +138,3 @@ export const BASE_THEME_ID = 'classic-light';
 /** System mode: which theme each `prefers-color-scheme` value maps to. */
 export const SYSTEM_THEMES = { light: 'classic-light', dark: 'classic-dark' };
 export const THEME_IDS = THEMES.map((t) => t.id);
-/** Small summary for pickers and docs: id, label, scheme and a few swatches. */
-export function themeCatalogue(themes = THEMES) {
-    return themes.map((t) => ({
-        id: t.id,
-        label: t.label,
-        scheme: t.scheme,
-        swatches: [t.color.surface, t.color.card, t.color.text, t.color.accent],
-    }));
-}

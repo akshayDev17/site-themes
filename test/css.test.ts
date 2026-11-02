@@ -20,12 +20,13 @@ test('one [data-theme] block per theme, each with color-scheme and every colour 
   assert.equal(css.match(/\[data-theme="[a-z0-9-]+"\] \{/g)?.length, THEMES.length);
 });
 
-test('classic-light sits on :root; classic-dark applies under prefers dark with no data-theme', () => {
+test('classic-light sits on :root, and the only other blocks are one [data-theme] per theme', () => {
   const root = blockBody(':root');
   assert.ok(root.includes('color-scheme: light;'));
   assert.ok(root.includes('--surface: #EEF1F8;'));
   assert.ok(root.includes('--font-serif:'));
-  assert.match(css, /@media \(prefers-color-scheme: dark\) \{\n {2}:root:not\(\[data-theme\]\) \{\n {4}color-scheme: dark;\n {4}--surface: #0F1220;/);
+  const selectors = [...css.matchAll(/^(\S[^{\n]*?) \{$/gm)].map((m) => m[1]);
+  assert.deepEqual(selectors, [':root', ...THEMES.map((t) => `[data-theme="${t.id}"]`)]);
 });
 
 test('token names are kebab-case', () => {

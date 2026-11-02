@@ -56,10 +56,3 @@ export declare const SYSTEM_THEMES: {
     readonly dark: "classic-dark";
 };
 export declare const THEME_IDS: readonly string[];
-/** Small summary for pickers and docs: id, label, scheme and a few swatches. */
-export declare function themeCatalogue(themes?: readonly Theme[]): {
-    id: string;
-    label: string;
-    scheme: Scheme;
-    swatches: string[];
-}[];
