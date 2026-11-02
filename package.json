@@ -1,0 +1,45 @@
+{
+  "name": "site-themes",
+  "version": "0.1.0",
+  "description": "Build-time shared themes for the akshayprabhakant.com apps",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "repository": "github:akshayDev17/site-themes",
+  "files": ["dist"],
+  "sideEffects": ["*.css"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./boot": { "types": "./dist/boot.d.ts", "default": "./dist/boot.js" },
+    "./picker": { "types": "./dist/picker.d.ts", "default": "./dist/picker.js" },
+    "./react": { "types": "./dist/react.d.ts", "default": "./dist/react.js" },
+    "./themes": { "types": "./dist/themes.d.ts", "default": "./dist/themes.js" },
+    "./themes.css": "./dist/themes.css",
+    "./site-theme-boot.js": "./dist/site-theme-boot.js",
+    "./catalogue.json": "./dist/catalogue.json",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "rm -rf dist build && tsc -p tsconfig.json && tsc -p tsconfig.tools.json && node build/scripts/generate.js",
+    "test": "npm run build && node --test \"build/test/*.test.js\"",
+    "check:contrast": "tsc -p tsconfig.tools.json && node build/scripts/check-contrast.js"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "jsdom": "^26.1.0",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

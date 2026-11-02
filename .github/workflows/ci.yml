@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build and unit tests
+        run: npm test
+      - name: Contrast gate (report section 3.5.5 thresholds)
+        run: npm run check:contrast
+      - name: Committed dist/ matches the catalogue
+        run: |
+          if [ -n "$(git status --porcelain -- dist)" ]; then
+            git status --short -- dist
+            git diff -- dist
+            echo "::error::dist/ is stale. Run 'npm run build' and commit dist/."
+            exit 1
+          fi
