@@ -67,7 +67,7 @@ Accepted limits: the Cloudflare Access login pages cannot follow the theme. An i
 
 ## Install (pin a git tag)
 
-Install straight from GitHub. the npm registry is not involved, and the package is never published there (`"private": true`).
+Install straight from GitHub. The npm registry is not involved, and the package is never published there (`"private": true`).
 
 ```sh
 npm install github:akshayDev17/site-themes#v0.1.0
