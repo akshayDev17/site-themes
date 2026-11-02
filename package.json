@@ -10,6 +10,14 @@
   "sideEffects": ["*.css"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "boot": ["./dist/boot.d.ts"],
+      "picker": ["./dist/picker.d.ts"],
+      "react": ["./dist/react.d.ts"],
+      "themes": ["./dist/themes.d.ts"]
+    }
+  },
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
     "./boot": { "types": "./dist/boot.d.ts", "default": "./dist/boot.js" },
