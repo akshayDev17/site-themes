@@ -240,7 +240,7 @@ A change to `src/` or `shell/` is one PR. CI builds and tests it, and the `site-
 ### Deploying site-shell
 
 `.github/workflows/site-shell.yml` has three triggers:
-- **PRs from this repository:** uploads a preview version (`wrangler versions upload --preview-alias pr-<n>`), which is not deployed. It answers at `https://pr-<n>-site-shell.<subdomain>.workers.dev`.
+- **PRs from this repository:** uploads a preview version (`wrangler versions upload --preview-alias pr-<n>`), which is not deployed. It answers at `https://pr-<n>-site-shell.<subdomain>.workers.dev`. Until the Worker exists, the run skips the upload with a notice; the first merge to `main` creates it.
 - **Pushes to `main`:** deploys (`wrangler deploy`), to workers.dev only.
 - **A manual run on `main`:** also deploys.
 

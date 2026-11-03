@@ -5,7 +5,9 @@
 # - pull_request (this repo's branches): `wrangler versions upload` with a per-PR
 #   alias. The version is NOT deployed; it answers only at its own Version URL,
 #   https://pr-<n>-site-shell.<workers.dev subdomain>.workers.dev. Apps bound to
-#   site-shell keep calling the deployed version.
+#   site-shell keep calling the deployed version. Until the Worker exists (the
+#   first merge to main creates it) the PR run skips the upload and smoke test
+#   with a notice.
 # - push to main, or a manual run on main: `wrangler deploy`, live at
 #   site-shell.<subdomain>.workers.dev and to every app that binds SHELL.
 #
@@ -94,8 +96,27 @@ jobs:
             exit 1
           fi
 
-      - name: Upload a preview version (PR)
+      - name: Check that the Worker exists (PR)
+        # `wrangler versions upload` needs an existing Worker; the first merge to
+        # main creates it with `wrangler deploy`.
         if: steps.gate.outputs.ready == 'true' && github.event_name == 'pull_request'
+        id: worker
+        run: |
+          status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/site-shell/settings")
+          case "$status" in
+            200) echo "exists=true" >> "$GITHUB_OUTPUT" ;;
+            404)
+              msg="Worker site-shell does not exist yet, so no preview version was uploaded or smoke-tested (ci.yml built and tested it). The first merge to main creates it with wrangler deploy."
+              echo "::notice title=site-shell preview skipped::$msg"
+              echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+              echo "exists=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::Could not check whether Worker site-shell exists (Cloudflare API HTTP $status)"; exit 1 ;;
+          esac
+
+      - name: Upload a preview version (PR)
+        if: steps.worker.outputs.exists == 'true'
         id: preview
         env:
           PR: ${{ github.event.pull_request.number }}
@@ -126,7 +147,7 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Smoke-test what was uploaded
-        if: steps.gate.outputs.ready == 'true'
+        if: steps.preview.outputs.url || steps.deploy.outputs.url
         env:
           URL: ${{ steps.preview.outputs.url || steps.deploy.outputs.url }}
         run: |
@@ -145,7 +166,7 @@ jobs:
           exit 1
 
       - name: Comment the preview URL (PR)
-        if: steps.gate.outputs.ready == 'true' && github.event_name == 'pull_request'
+        if: steps.preview.outputs.url
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
