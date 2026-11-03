@@ -2,7 +2,10 @@
 // headless Chrome and speaks CDP over Node's built-in WebSocket, so the tests
 // need no browser-automation dependency. CHROME_PATH picks the browser.
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const CANDIDATES = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -18,12 +21,10 @@ export function chromePath() {
   return found;
 }
 
-/**
- * Starts headless Chrome; returns { page, close }. page(sessionCall) drives one new tab.
- * Without --user-data-dir, headless Chrome makes and removes its own temporary profile.
- */
+/** Starts headless Chrome; returns { page, close }. page(sessionCall) drives one new tab. */
 export async function launchChrome() {
-  const child = spawn(chromePath(), ['--headless=new', '--remote-debugging-port=0',
+  const profile = mkdtempSync(join(tmpdir(), 'site-shell-chrome-'));
+  const child = spawn(chromePath(), ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--no-sandbox', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   const exited = new Promise((r) => child.on('exit', r));
   const url = await new Promise((resolve, reject) => {
@@ -71,6 +72,9 @@ export async function launchChrome() {
       ws.close();
       child.kill();
       await exited;
+      // Chrome's helpers can still be writing the profile after the browser exits; a
+      // leftover temp directory is harmless, so a failed removal never fails the tests.
+      await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {});
     },
   };
 }
