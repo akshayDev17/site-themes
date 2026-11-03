@@ -165,7 +165,7 @@ CI computes WCAG contrast for every theme and fails below the thresholds in repo
 | cardLine | surface, card | 3:1 |
 | focus | surface, surface2, card | 3:1 |
 
-A card's border separates the card from the page it sits on, so `cardLine` is gated against `surface` and `card` only, not `surface2`. A card or control bordered with `--card-line` that sits on `surface2` must carry a `--card` background. The picker's `<select>` always does. `line` and `lineStrong` are decorative dividers and exempt. Run the gate locally with `npm run check:contrast`. It prints every pair.
+A card's border separates the card from the page it sits on, so `cardLine` is gated against `surface` and `card` only, not `surface2`. A card or control bordered with `--card-line` that sits on `surface2` must carry a `--card` background. The picker's control and its open list always do. `line` and `lineStrong` are decorative dividers and exempt. Run the gate locally with `npm run check:contrast`. It prints every pair.
 
 ## Adding a theme
 
