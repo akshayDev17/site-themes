@@ -1,0 +1,9 @@
+{
+  // Harness only: site-shell with an ASSET_BASE that compose() rejects, so the
+  // homepage's compose throws after Pages has answered. Never deployed.
+  "name": "site-shell",
+  "main": "../worker.ts",
+  "compatibility_date": "2026-10-10",
+  "assets": { "directory": "../public", "binding": "ASSETS" },
+  "vars": { "ASSET_BASE": "javascript:", "HOME_ORIGIN": "https://akshayprabhakant.com" }
+}

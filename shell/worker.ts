@@ -9,7 +9,8 @@
 //   and the homepage.
 // - Routes (wrangler.jsonc): akshayprabhakant.com/_site/* and the exact
 //   akshayprabhakant.com/. The homepage is composed from GitHub Pages and fails
-//   open to the Pages response unchanged.
+//   open to the Pages response unchanged. It is served on HOME_ORIGIN's host
+//   only: elsewhere (workers.dev, a preview URL) / is a 404 like any non-file.
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { composeResponse, type Build, type ComposeOptions } from './compose';
 import build from './generated/build.json';
@@ -26,21 +27,15 @@ export interface Env {
    * Where the homepage is built and served: GitHub Pages behind
    * https://akshayprabhakant.com. On the zone's exact `/` route, a fetch to
    * the same zone goes to the DNS origin (Pages), never back to this Worker.
+   * The homepage is served only to requests for this host.
    */
   HOME_ORIGIN: string;
 }
 
-/**
- * Request header that forces the homepage's fail-open path, to prove it on a
- * workers.dev or local copy. Ignored on HOME_ORIGIN's own host (and port), so no visitor
- * of the live site can trigger it.
- */
-const FAULT_HEADER = 'x-site-shell-fault';
-
 export default class SiteShell extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === '/') return this.home(request, url);
+    if (url.pathname === '/' && url.host === new URL(this.env.HOME_ORIGIN).host) return this.home(request, url);
     if (url.pathname.startsWith('/_site/')) {
       const res = await this.env.ASSETS.fetch(request);
       // _headers marks everything under /_site/* immutable for a year, the
@@ -68,9 +63,6 @@ export default class SiteShell extends WorkerEntrypoint<Env> {
     if (request.method !== 'GET') return upstream();
     try {
       const res = await upstream();
-      if (request.headers.get(FAULT_HEADER) === 'compose' && url.host !== origin.host) {
-        throw new Error('fault: forced by request header');
-      }
       return composeResponse(res, { app: 'home', assetBase: this.env.ASSET_BASE ?? '/_site/' }, build as Build);
     } catch (err) {
       console.error('site-shell: homepage compose failed, serving GitHub Pages unchanged:', String(err));
@@ -87,7 +79,6 @@ export default class SiteShell extends WorkerEntrypoint<Env> {
  */
 function homeRequest(request: Request): RequestInit {
   const headers = new Headers(request.headers);
-  headers.delete(FAULT_HEADER);
   if (request.method === 'GET') {
     headers.delete('if-none-match');
     headers.delete('if-modified-since');

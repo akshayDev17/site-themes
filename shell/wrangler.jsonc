@@ -20,8 +20,8 @@
     { "pattern": "akshayprabhakant.com/_site/*", "zone_name": "akshayprabhakant.com" },
     { "pattern": "akshayprabhakant.com/", "zone_name": "akshayprabhakant.com" }
   ],
-  // workers.dev on, so a preview version answers at its own Version URL, and
-  // the composed homepage can be checked there before it is live.
+  // workers.dev on, so a preview version's shared files answer at its own
+  // Version URL. Its / is a 404: the homepage is served on HOME_ORIGIN's host only.
   "workers_dev": true,
   "preview_urls": true,
 

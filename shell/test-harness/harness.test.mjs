@@ -25,6 +25,7 @@ const SHELL = 'shell/wrangler.jsonc';
 const UNROUTED_SHELL = 'shell/test-harness/shell-unrouted.jsonc';
 const THROWING_SHELL = 'shell/test-harness/shell-throw.jsonc';
 const MIDSTREAM_SHELL = 'shell/test-harness/shell-midstream.jsonc';
+const BAD_ASSET_BASE_SHELL = 'shell/test-harness/shell-bad-asset-base.jsonc';
 let nextPort = 18801;
 
 /**
@@ -32,9 +33,9 @@ let nextPort = 18801;
  * registry is private to this run: a site-shell left running by any other
  * session would otherwise answer this session's SHELL binding.
  */
-async function session(t, configs, vars = {}) {
+async function session(t, configs, vars = {}, extra = []) {
   const port = nextPort++;
-  const args = ['dev', ...configs.flatMap((c) => ['-c', c]), ...Object.entries(vars).flatMap(([k, v]) => ['--var', `${k}:${v}`]),
+  const args = ['dev', ...configs.flatMap((c) => ['-c', c]), ...Object.entries(vars).flatMap(([k, v]) => ['--var', `${k}:${v}`]), ...extra,
     '--ip', '127.0.0.1', '--port', String(port),
     '--inspector-port', String(port + 1000), '--persist-to', join(scratch, 'state'), '--log-level', 'info'];
   const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_REGISTRY_PATH: join(scratch, 'registry') };
@@ -229,14 +230,18 @@ async function fakePages(t) {
       etag: '"6a0f0c4e-61a4"', 'last-modified': 'Tue, 03 Nov 2026 05:23:36 GMT' };
     if (pages.mode === 'redirect') res.writeHead(301, { location: 'https://akshayprabhakant.com/elsewhere/' }).end();
     else if (pages.mode === 'error') res.writeHead(503, { 'content-type': 'text/html; charset=utf-8' }).end('<p>down</p>');
-    else if (pages.mode === 'composed') res.writeHead(200, { ...html, 'x-site-shell': 'abc; app=home' }).end(page);
     else if (req.method === 'HEAD') res.writeHead(200, html).end();
     else res.writeHead(200, html).end(page);
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   t.after(() => new Promise((r) => server.close(r)));
-  return { page: page.toString('utf8'), origin: `http://127.0.0.1:${server.address().port}`, set: (m) => (pages.mode = m), seen: pages.seen };
+  const host = `127.0.0.1:${server.address().port}`;
+  return { page: page.toString('utf8'), host, origin: `http://${host}`, set: (m) => (pages.mode = m), seen: pages.seen };
 }
+
+/** site-shell with HOME_ORIGIN at the stand-in and requests addressed to its host, as on akshayprabhakant.com. */
+const homeSession = (t, pages, config = SHELL) =>
+  session(t, [config], { HOME_ORIGIN: pages.origin }, ['--local-upstream', pages.host]);
 
 /** The homepage as Pages serves it plus the one insertion after its <meta charset="utf-8">. */
 const homeComposed = (page) => {
@@ -247,7 +252,7 @@ const homeComposed = (page) => {
 
 test('home (exact / route): GitHub Pages\' homepage plus the head block, byte for byte, and nothing else', async (t) => {
   const pages = await fakePages(t);
-  const s = await session(t, [SHELL], { HOME_ORIGIN: pages.origin });
+  const s = await homeSession(t, pages);
 
   const res = await fetch(`${s.base}/`, { headers: { 'if-none-match': '"6a0f0c4e-61a4"', 'if-modified-since': 'Tue, 03 Nov 2026 05:23:36 GMT' } });
   const body = await res.text();
@@ -285,21 +290,21 @@ test('home (exact / route): GitHub Pages\' homepage plus the head block, byte fo
   assert.equal(js.headers.get('cache-control'), 'public, max-age=31536000, immutable');
 });
 
-test('home: a forced compose error serves GitHub Pages\' page unchanged', async (t) => {
+test('home: a compose error serves GitHub Pages\' page unchanged, fetched again', async (t) => {
   const pages = await fakePages(t);
-  const s = await session(t, [SHELL], { HOME_ORIGIN: pages.origin });
-  const res = await fetch(`${s.base}/`, { headers: { 'x-site-shell-fault': 'compose' } });
+  const s = await homeSession(t, pages, BAD_ASSET_BASE_SHELL);
+  const res = await fetch(`${s.base}/`);
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('x-site-shell'), null);
   assert.equal(res.headers.get('etag'), '"6a0f0c4e-61a4"', 'Pages\' own headers');
   assert.equal(await res.text(), pages.page, 'exactly what Pages served');
-  assert.equal(pages.seen.at(-1).headers['x-site-shell-fault'], undefined, 'the fault header is not forwarded');
+  assert.equal(pages.seen.length, 2, 'the page is fetched again, not the body handed to compose');
   assert.match(await logMatching(s, /homepage compose failed/), /homepage compose failed, serving GitHub Pages unchanged/);
 });
 
-test('home: Pages redirects, errors and already-composed pages pass through unchanged', async (t) => {
+test('home: Pages redirects and errors pass through unchanged', async (t) => {
   const pages = await fakePages(t);
-  const s = await session(t, [SHELL], { HOME_ORIGIN: pages.origin });
+  const s = await homeSession(t, pages);
 
   pages.set('redirect');
   const moved = await fetch(`${s.base}/`, { redirect: 'manual' });
@@ -311,11 +316,17 @@ test('home: Pages redirects, errors and already-composed pages pass through unch
   const down = await fetch(`${s.base}/`);
   assert.equal(down.status, 503);
   assert.equal(await down.text(), '<p>down</p>');
+});
 
-  // The workers.dev copy fetching the routed homepage gets it composed already: never twice.
-  pages.set('composed');
-  const once = await fetch(`${s.base}/`);
-  assert.equal(once.headers.get('x-site-shell'), 'abc; app=home');
-  assert.equal(await once.text(), pages.page);
+test('home: on any host but HOME_ORIGIN\'s (workers.dev, a preview URL), / is a 404 and Pages is never asked', async (t) => {
+  const pages = await fakePages(t);
+  const s = await session(t, [UNROUTED_SHELL], { HOME_ORIGIN: pages.origin });
+  for (const method of ['GET', 'HEAD']) {
+    const res = await fetch(`${s.base}/`, { method });
+    assert.equal(res.status, 404, method);
+    assert.equal(res.headers.get('cache-control'), 'no-store', method);
+  }
+  assert.equal(pages.seen.length, 0);
+  assert.equal((await fetch(`${s.base}/_site/${build().id}/site.js`)).status, 200, 'the shared files are still served');
 });
 

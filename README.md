@@ -205,11 +205,11 @@ Nothing else in the page changes. Responses that are not `200 text/html` pass th
 The homepage is built and served by GitHub Pages; site-shell sits in front of it on the exact `/` route only. For a `GET /` it fetches the same URL from `HOME_ORIGIN` (`https://akshayprabhakant.com`; a Worker's fetch to its own zone goes to the DNS origin, GitHub Pages, never back to a Worker) and composes the answer exactly as for an app: the head block after `<meta charset="utf-8">`, nothing else changed, Pages' headers kept except `ETag` and `Last-Modified`.
 
 - It asks Pages with redirects left manual and without `If-None-Match` or `If-Modified-Since`, so a Pages redirect reaches the browser as one and a GET always gets a page to compose.
-- Anything that is not a `200 text/html` answer to a `GET` (a `HEAD`, a redirect, a Pages error) passes through unchanged, and so does a page that already carries `x-site-shell`.
+- Anything that is not a `200 text/html` answer to a `GET` (a `HEAD`, a redirect, a Pages error) passes through unchanged.
 - **Fail open:** any error before the page starts streaming serves Pages' response unchanged, and an uncaught error passes the request through to the origin (`passThroughOnException`).
 - A route pattern matches the whole URL, query included, so `/?anything` is not routed: GitHub Pages serves it directly, as before.
 - The homepage still bundles site-themes v0.2.0. The composed boot runs first and sets `__siteThemeBoot`, so the bundled boot does nothing; the bundled picker module sees `<site-theme-picker>` already defined and does nothing. Removing the homepage's copy of the package is a later homepage change.
-- To check the fail-open path on a workers.dev or local copy, send `x-site-shell-fault: compose`: the response is Pages' page unchanged. The header is ignored on `HOME_ORIGIN`'s own host, so no visitor of the live site can trigger it, and it is never forwarded to Pages.
+- The homepage is served only for `HOME_ORIGIN`'s host. On workers.dev or a preview URL, `/` answers `404` with `no-store` like any other path that is not a file, so there is no second copy of the homepage; check homepage changes, fail open included, with the local harness.
 
 ### Wiring an app
 
@@ -278,7 +278,7 @@ npm run test:shell                              # wrangler dev sessions: each ap
 npm run dev:shell                               # site-shell alone on localhost
 ```
 
-The harness runs on local workerd with no Cloudflare account. Each scenario is one `wrangler dev -c <app> -c <shell>` session with a private dev registry, because otherwise a site-shell left running by any other session would answer the binding. The homepage, chat and atlas fixtures are the public pages' HTML and CSS saved on 2026-11-03. Quiz and graph notes sit behind Access, so their fixtures are the index pages of a local static build of each app's `frontend/` from its `main` branch (see `make-fixtures.mjs`). The homepage tests run site-shell itself with `HOME_ORIGIN` pointed at a local stand-in for GitHub Pages that serves the saved homepage. The boot string is built in Node by `scripts/build-shell.ts`, never by `Function#toString()` inside the Worker bundle: wrangler's default `keep_names` would put `__name(...)` calls inside it, and those calls do not exist in a browser.
+The harness runs on local workerd with no Cloudflare account. Each scenario is one `wrangler dev -c <app> -c <shell>` session with a private dev registry, because otherwise a site-shell left running by any other session would answer the binding. The homepage, chat and atlas fixtures are the public pages' HTML and CSS saved on 2026-11-03. Quiz and graph notes sit behind Access, so their fixtures are the index pages of a local static build of each app's `frontend/` from its `main` branch (see `make-fixtures.mjs`). The homepage tests run site-shell itself with `HOME_ORIGIN` pointed at a local stand-in for GitHub Pages that serves the saved homepage, and requests addressed to that host (`--local-upstream`); fail open is shown with `shell-bad-asset-base.jsonc`, whose `ASSET_BASE` compose() rejects. The boot string is built in Node by `scripts/build-shell.ts`, never by `Function#toString()` inside the Worker bundle: wrangler's default `keep_names` would put `__name(...)` calls inside it, and those calls do not exist in a browser.
 
 ## Changelog
 
