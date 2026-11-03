@@ -6,5 +6,5 @@
     "outDir": "build",
     "types": ["node"]
   },
-  "include": ["src", "scripts", "test"]
+  "include": ["src", "scripts", "test", "shell/nav.ts"]
 }

@@ -3,7 +3,7 @@
 Shared themes for the akshayprabhakant.com apps (homepage, chat archive, quiz, graph notes, election atlas), delivered two ways from one catalogue (`src/themes.ts`):
 
 - **The build-time package** (`dist/`, everything up to [site-shell](#site-shell)). Each app installs a pinned git tag and bundles the themes into its own build, so nothing is fetched when a page loads. Every app uses it today.
-- **site-shell** (`shell/`), a Cloudflare Worker that adds the theme to each app's HTML as it streams out, so one release reaches every app at its next page view. It serves the shared files at `akshayprabhakant.com/_site/*` and composes the homepage (`/`); no app binds it yet. See [site-shell](#site-shell).
+- **site-shell** (`shell/`), a Cloudflare Worker that adds the theme and the site navigation to each app's HTML as it streams out, so one release reaches every app at its next page view. It serves the shared files at `akshayprabhakant.com/_site/*` and composes the homepage (`/`); no app binds it yet. See [site-shell](#site-shell).
 
 Installing the package from git still copies only `dist/` (`"files"` in `package.json`), so site-shell changes never reach an app through the package and need no tag.
 
@@ -180,7 +180,7 @@ The CSS, the boot script's id list and the picker's options all derive from the 
 
 ## site-shell
 
-site-shell is the shared Worker that composes the theme into every app's HTML (theme only for now; navigation comes later). It is built from the same catalogue, boot script and picker as the package.
+site-shell is the shared Worker that composes the theme, and the site navigation where a page asks for it, into every app's HTML. It is built from the same catalogue, boot script and picker as the package, and from the app list (`src/apps.ts`).
 
 **Status:** it has exactly two routes, both approved by the owner: `akshayprabhakant.com/_site/*` (the shared files) and the exact `akshayprabhakant.com/` (the homepage, see [The homepage](#the-homepage)). No app binds it yet. The catch-all `akshayprabhakant.com/*` is not routed and must not be.
 
@@ -190,9 +190,36 @@ An app's Worker hands each HTML response to site-shell over a Service Binding: `
 
 1. the boot script, inline (the same one the package exports), so `<html data-theme>` is set before first paint;
 2. the theme tokens, inline (`:root,[data-theme="classic-light"]{…}[data-theme="classic-dark"]{…}`), so even a first visit has no flash and no extra request;
-3. `<script defer src="<assetBase><build>/site.js">`, which defines `<site-theme-picker>`. The app keeps placing the element itself.
+3. `<script defer src="<assetBase><build>/site.js">`, which defines `<site-theme-picker>` (the app keeps placing the element itself) and opens the site path's sheet in browsers without invoker commands.
+4. on an [unlisted](#the-app-list) app's pages only: `<meta name="robots" content="noindex">`.
 
-Nothing else in the page changes. Responses that are not `200 text/html` pass through untouched. Composed pages drop `ETag` and `Last-Modified`, because the page now depends on the site-shell build too, and carry `x-site-shell: <build>; app=<app>`.
+It also fills two elements an app may place in its body, from the [app list](#the-app-list):
+
+| Slot | What compose() puts inside it |
+|---|---|
+| `<site-slot name="site-path" data-tail='[{"label":"India","href":"/elections/india/"}]'>` | The site path: `akshayprabhakant.com / Portfolio  AI Digest  Quiz Room  Graph Notes  Election Atlas / <the app's crumbs>`. The apps sit inline wherever there is room. The current app is in ink and underlined: plain text with `aria-current="page"` at the app's root, otherwise a link to its root with `aria-current="true"`. `data-tail` is the app's own crumbs after its name, as JSON; the last one is the current page, shown as plain text with `aria-current="page"`, and each `href` must be a path on this site. At 900 px and below the site name reads "AP". At 640 px and below (portrait phones) the apps fold into the current app's name, a button that opens a bottom sheet listing them with their blurbs and a visible Close button, and only the last crumb shows. |
+| `<site-slot name="site-apps">` | The listed apps other than the homepage, as a `<ul class="site-apps">` of links (name, lock, blurb, `data-app`, `data-gated`), for the homepage Apps cards. |
+
+- The `<site-slot>` element and its attributes stay; only its content is replaced. Whatever the app puts inside it is the fallback that shows when compose() does not run, for example the app's own back link.
+- **A page with no slot gets no navigation at all**, so an app that has not placed one is unchanged.
+- Each slot carries its own small `<style>`; there is no extra request. The path is Newsreader (`--font-serif`) at 15 px in sentence case, uses only theme tokens, and marks the current app in `--text`, never the accent. Every link and button is at least 44 px tall; the phone button is drawn 34 px tall with a 44 px tap area.
+- The accessible names start with the visible text: the site name is "akshayprabhakant.com home" (or "AP, akshayprabhakant.com home" where it reads "AP"), the phone button "<app>, switch app" (its chevron is `aria-hidden`), and a gated app reads "<app> (invite-only, sign-in required)" next to an `aria-hidden` lock.
+- The bottom sheet is a modal `<dialog>` opened and closed by invoker commands (`<button commandfor command="show-modal">`) and light-dismissed by `closedby="any"`, so it needs no JavaScript in browsers that support them. `site.js` does both in browsers that do not.
+- Each slot name is filled once per page. An unknown slot name, an app id missing from the list, or a malformed `data-tail` leaves the slot as the app wrote it (the last one logs `site-shell: handler skipped`).
+- In a React app, hydration must not replace the slot's content. Render the slot with `dangerouslySetInnerHTML` (the fallback) and `suppressHydrationWarning`, then check the page after hydration.
+
+### The app list
+
+`src/apps.ts` is the one place every app is listed: `id` (what the app's Worker passes as `compose({ app })`), `label`, `path`, a one-line `blurb`, `gated` and `listed`. The first entry is the homepage, `home`, labelled "Portfolio". Order there is order everywhere. The owner controls it: a change is a PR to this repository, and once it is merged the deploy reaches every composed page at its next view. `npm run build` rejects a list with a duplicate or malformed id, an empty label, a path that does not start with a single `/`, or a first entry that is not a listed `home` at `/`.
+
+| `listed` | The switcher on other apps and the homepage list | The app's own pages |
+|---|---|---|
+| `true` | shown | indexed as usual |
+| `false` (unlisted) | **not shown** | the switcher still shows it, tagged "Not listed"; `noindex`; direct links keep working |
+
+Unlisting is not locking. To make an app private, put it behind Cloudflare Access; `gated: true` only draws the lock and its text. `src/apps.ts` is compiled into `dist/` like the rest of `src/`, but the package does not export it, so it needs no tag.
+
+Nothing else in the page changes: outside the head block and the slots above, the page is byte for byte as the app built it. Responses that are not `200 text/html` pass through untouched. Composed pages drop `ETag` and `Last-Modified`, because the page now depends on the site-shell build too, and carry `x-site-shell: <build>; app=<app>`.
 
 ### Files at /_site/\<build\>/
 
@@ -202,7 +229,7 @@ Nothing else in the page changes. Responses that are not `200 text/html` pass th
 
 ### The homepage
 
-The homepage is built and served by GitHub Pages; site-shell sits in front of it on the exact `/` route only. For a `GET /` it fetches the same URL from `HOME_ORIGIN` (`https://akshayprabhakant.com`; a Worker's fetch to its own zone goes to the DNS origin, GitHub Pages, never back to a Worker) and composes the answer exactly as for an app: the head block after `<meta charset="utf-8">`, nothing else changed, Pages' headers kept except `ETag` and `Last-Modified`.
+The homepage is built and served by GitHub Pages; site-shell sits in front of it on the exact `/` route only. For a `GET /` it fetches the same URL from `HOME_ORIGIN` (`https://akshayprabhakant.com`; a Worker's fetch to its own zone goes to the DNS origin, GitHub Pages, never back to a Worker) and composes the answer exactly as for an app (`app: 'home'`): the head block after `<meta charset="utf-8">` and any [slots](#site-shell) the page places filled, nothing else changed, Pages' headers kept except `ETag` and `Last-Modified`.
 
 - It asks Pages with redirects left manual and without `If-None-Match` or `If-Modified-Since`, so a Pages redirect reaches the browser as one and a GET always gets a page to compose.
 - Anything that is not a `200 text/html` answer to a `GET` (a `HEAD`, a redirect, a Pages error) passes through unchanged.
@@ -242,6 +269,7 @@ The homepage is built and served by GitHub Pages; site-shell sits in front of it
 |---|---|
 | No `SHELL` binding, site-shell not deployed or unreachable, or `compose()` throws | the page exactly as built (after step 4, in Classic Light, with no picker) |
 | An edit throws while the page streams | that edit is skipped; every handler is guarded |
+| A slot cannot be filled (malformed `data-tail`, an app missing from the list) | that slot keeps the app's fallback content; the rest of the page is composed |
 | A platform fault after the response has started (for example a CPU limit) | an error or a cut-short page: no hook can recover once streaming has begun |
 | The homepage: fetching or composing fails before the page streams | GitHub Pages' response, unchanged |
 | The homepage: an uncaught error in site-shell | the request passes through to GitHub Pages |
@@ -282,7 +310,7 @@ The harness runs on local workerd with no Cloudflare account. Each scenario is o
 
 ## Changelog
 
-- **Unreleased**: site-shell is routed at `akshayprabhakant.com/_site/*` (composed pages load `/_site/<build>/` through `ASSET_BASE`) and the exact `akshayprabhakant.com/`, where it composes the GitHub Pages homepage and fails open to Pages. Earlier: added site-shell (`shell/`, `scripts/build-shell.ts`), the theme-only composition Worker. The package (`dist/`) is unchanged, so no tag is needed.
+- **Unreleased**: the app list (`src/apps.ts`), and compose() fills `<site-slot name="site-path">` with the site path switcher and `<site-slot name="site-apps">` with the homepage list; an unlisted app's pages are `noindex`. Pages without a slot are unchanged. Earlier: site-shell is routed at `akshayprabhakant.com/_site/*` (composed pages load `/_site/<build>/` through `ASSET_BASE`) and the exact `akshayprabhakant.com/`, where it composes the GitHub Pages homepage and fails open to Pages. Earlier: added site-shell (`shell/`, `scripts/build-shell.ts`), the theme-only composition Worker. The package's exports are unchanged (`dist/` gains `apps.js`, which is not exported), so no tag is needed.
 - **0.2.0**: removed the Slate Light (`slate-light`) and Slate Dark (`slate-dark`) themes. The catalogue is now Classic Light and Classic Dark, with System as the default. A stored slate id falls back to System (Classic Light or Classic Dark through `prefers-color-scheme`). Every export and token name is unchanged, so an app bumps with no code change.
 - **0.1.0**: first release, with Classic Light, Classic Dark, Slate Light and Slate Dark.
 
@@ -294,4 +322,4 @@ npm test                 # build (tsc + generate dist/) and run unit tests (node
 npm run check:contrast   # the contrast gate
 ```
 
-Layout: `src/themes.ts` holds the catalogue, `src/css.ts` generates the CSS, `src/contrast.ts` holds the gate, `src/boot.ts` the head script, `src/picker.ts` the custom element and `src/react.ts` the wrapper. `scripts/` writes the non-TS outputs into `dist/` and site-shell's build into `shell/generated/` and `shell/public/`. `shell/` holds the site-shell Worker (`worker.ts`, `compose.ts`, `client/site.ts`, `wrangler.jsonc`) and its harness (`test-harness/`).
+Layout: `src/themes.ts` holds the catalogue, `src/apps.ts` the app list, `src/css.ts` generates the CSS, `src/contrast.ts` holds the gate, `src/boot.ts` the head script, `src/picker.ts` the custom element and `src/react.ts` the wrapper. `scripts/` writes the non-TS outputs into `dist/` and site-shell's build into `shell/generated/` and `shell/public/`. `shell/` holds the site-shell Worker (`worker.ts`, `compose.ts`, `nav.ts` for the slot markup, `client/site.ts`, `wrangler.jsonc`) and its harness (`test-harness/`). `test/compose.test.ts` runs compose() in workerd through Miniflare; `test/nav.test.ts` checks the slot markup with jsdom.

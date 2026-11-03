@@ -1,9 +1,16 @@
 // compose(): adds the shared site parts to an app's HTML as it streams out.
 //
-// Theme only for now: the inline boot script and the inline theme tokens go
-// first in <head> (after a leading <meta charset>, which must stay inside the
-// first 1024 bytes), followed by the deferred /_site/<build>/site.js that
-// defines <site-theme-picker>.
+// - <head>: the inline boot script and the inline theme tokens go first (after
+//   a leading <meta charset>, which must stay inside the first 1024 bytes),
+//   followed by the deferred /_site/<build>/site.js that defines
+//   <site-theme-picker>. An unlisted app's pages also get a noindex robots meta.
+// - <site-slot name="site-path"> and <site-slot name="site-apps">: filled from
+//   the app list (src/apps.ts; markup in nav.ts). The <site-slot> element stays
+//   and only its content is replaced, so whatever the app put inside it is the
+//   fallback shown when compose() does not run. A page with no slot gets no
+//   navigation at all.
+import { APP_ID, APPS, type App } from '../src/apps.js';
+import { isUnlisted, slotMarkup } from './nav.js';
 
 export interface Build {
   /** Content hash of this release's assets; also the /_site/<id>/ directory. */
@@ -26,7 +33,20 @@ export interface ComposeOptions {
 }
 
 const ASSET_BASE = /^\/(?:[a-z0-9_-]+\/)*_site\/$/;
-const APP = /^[a-z0-9-]{1,32}$/;
+const NOINDEX = '<meta name="robots" content="noindex" data-site-shell>';
+const CHAR_REF = /&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|(quot|amp|apos|lt|gt));/g;
+const NAMED_REFS: Record<string, string> = { quot: '"', amp: '&', apos: "'", lt: '<', gt: '>' };
+
+/** HTMLRewriter returns attribute values as written; this resolves their character references. */
+function decodeAttr(raw: string | null): string | null {
+  return (
+    raw?.replace(CHAR_REF, (ref, dec?: string, hex?: string, name?: string) => {
+      if (name) return NAMED_REFS[name];
+      const cp = dec ? Number(dec) : parseInt(hex!, 16);
+      return cp <= 0x10ffff ? String.fromCodePoint(cp) : ref;
+    }) ?? null
+  );
+}
 
 export function isHtml(res: Response): boolean {
   return res.status === 200 && (res.headers.get('content-type') ?? '').toLowerCase().startsWith('text/html');
@@ -42,12 +62,14 @@ export function headMarkup(build: Build, assetBase = '/_site/'): string {
 /**
  * Returns the composed response, or `res` itself for anything that is not a
  * 200 HTML page. Validators are dropped: the body now depends on this build as
- * well as on the app's file, so the app's ETag no longer describes it.
+ * well as on the app's file, so the app's ETag no longer describes it. `apps`
+ * is the app list; only tests pass another one.
  */
-export function composeResponse(res: Response, opts: ComposeOptions, build: Build): Response {
+export function composeResponse(res: Response, opts: ComposeOptions, build: Build, apps: readonly App[] = APPS): Response {
   if (!isHtml(res)) return res;
-  if (!APP.test(opts.app)) throw new Error(`bad app: ${opts.app}`);
-  const markup = headMarkup(build, opts.assetBase);
+  if (!APP_ID.test(opts.app)) throw new Error(`bad app: ${opts.app}`);
+  const unlisted = isUnlisted(opts.app, apps);
+  const markup = headMarkup(build, opts.assetBase) + (unlisted ? NOINDEX : '');
 
   const headers = new Headers(res.headers);
   headers.delete('etag');
@@ -64,8 +86,21 @@ export function composeResponse(res: Response, opts: ComposeOptions, build: Buil
     else el.before(markup, { html: true });
   };
 
+  // Each slot name is filled once per page (the site path's sheet has a fixed id).
+  const filled = new Set<string>();
+  const fillSlot = (el: Element) => {
+    const attr = (attrName: string) => decodeAttr(el.getAttribute(attrName));
+    const name = attr('name') ?? '';
+    if (filled.has(name)) return;
+    const html = slotMarkup(name, attr, opts.app, apps);
+    if (html === null) return;
+    filled.add(name);
+    el.setInnerContent(html, { html: true });
+  };
+
   return new HTMLRewriter()
     .on('head > *', { element: guard(insertNear) })
+    .on('site-slot[name]', { element: guard(fillSlot) })
     .on('head', {
       element: guard((el: Element) => {
         el.onEndTag((end) => {

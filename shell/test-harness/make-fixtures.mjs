@@ -8,6 +8,8 @@
 // - as today: each page carries its own bundled boot script and tokens;
 // - migrated: boot script and bundled tokens removed (what an app ships after
 //   its site-shell PR), so the theme can only come from compose().
+// chat/out/chat-archives/slotted.html is the page as today plus a
+// <site-slot name="site-path">; no other fixture has a slot.
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +46,12 @@ put(join(apps, 'chat/out/chat-archives/big500.html'), big500);
 // two isolates what compose() adds
 put(join(apps, 'chat/out/chat-archives/big500.txt'), big500);
 put(join(apps, 'chat/out/chat-archives/big50.txt'), read('home.html'));
+
+// chat, as today plus a site path slot (what an app ships after its slot PR), with the
+// app's own crumb as data and a fallback link for when compose() does not run
+const SLOT = `<site-slot name="site-path" data-tail='[{"label":"Front page"}]'><a href="/">← Akshay Prabhakant</a></site-slot>`;
+if (chatHtml.split('<body>').length !== 2) throw new Error('chat.html has one <body>');
+put(join(apps, 'chat/out/chat-archives/slotted.html'), chatHtml.replace('<body>', `<body>${SLOT}`));
 
 // chat, migrated
 const migrated = stripBoot(chatHtml);
