@@ -63,7 +63,7 @@ const LOCK_CSS = '.site-lock{fill:none;stroke:currentColor;stroke-width:2;margin
 // Newsreader, sentence case, 15 px; every target at least 44 px (the path's
 // left padding is pulled back so its text lines up with the masthead); the current
 // app in ink (not accent), underlined; the tail's current page plain ink text.
-// Below 900 px the site name is "AP"; at 640 px and below the apps fold into
+// At 900 px and below the site name is "AP"; at 640 px and below the apps fold into
 // the pill and only the last crumb of the tail shows.
 const PATH_CSS = [
   'site-slot[name="site-path"]{display:block}',

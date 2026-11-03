@@ -210,7 +210,7 @@ It also fills two elements an app may place in its body, from the [app list](#th
 
 ### The app list
 
-`src/apps.ts` is the one place every app is listed: `id` (what the app's Worker passes as `compose({ app })`), `label`, `path`, a one-line `blurb`, `gated` and `listed`. The first entry is the homepage, `home`, labelled "Portfolio". Order there is order everywhere. The owner controls it: a change is a PR to this repository, and once it is merged the deploy reaches every composed page at its next view. `npm run build` rejects a list with a duplicate or malformed id, a path that does not start with a single `/`, or no `home` entry first.
+`src/apps.ts` is the one place every app is listed: `id` (what the app's Worker passes as `compose({ app })`), `label`, `path`, a one-line `blurb`, `gated` and `listed`. The first entry is the homepage, `home`, labelled "Portfolio". Order there is order everywhere. The owner controls it: a change is a PR to this repository, and once it is merged the deploy reaches every composed page at its next view. `npm run build` rejects a list with a duplicate or malformed id, an empty label, a path that does not start with a single `/`, or a first entry that is not a listed `home` at `/`.
 
 | `listed` | The switcher on other apps and the homepage list | The app's own pages |
 |---|---|---|
@@ -229,7 +229,7 @@ Nothing else in the page changes: outside the head block and the slots above, th
 
 ### The homepage
 
-The homepage is built and served by GitHub Pages; site-shell sits in front of it on the exact `/` route only. For a `GET /` it fetches the same URL from `HOME_ORIGIN` (`https://akshayprabhakant.com`; a Worker's fetch to its own zone goes to the DNS origin, GitHub Pages, never back to a Worker) and composes the answer exactly as for an app: the head block after `<meta charset="utf-8">`, nothing else changed, Pages' headers kept except `ETag` and `Last-Modified`.
+The homepage is built and served by GitHub Pages; site-shell sits in front of it on the exact `/` route only. For a `GET /` it fetches the same URL from `HOME_ORIGIN` (`https://akshayprabhakant.com`; a Worker's fetch to its own zone goes to the DNS origin, GitHub Pages, never back to a Worker) and composes the answer exactly as for an app (`app: 'home'`): the head block after `<meta charset="utf-8">` and any [slots](#site-shell) the page places filled, nothing else changed, Pages' headers kept except `ETag` and `Last-Modified`.
 
 - It asks Pages with redirects left manual and without `If-None-Match` or `If-Modified-Since`, so a Pages redirect reaches the browser as one and a GET always gets a page to compose.
 - Anything that is not a `200 text/html` answer to a `GET` (a `HEAD`, a redirect, a Pages error) passes through unchanged.
