@@ -1,9 +1,11 @@
 // Builds site-shell's static files and the data the Worker inlines:
 //
 //   shell/public/_site/<id>/site.js     the picker (esbuild bundle of shell/client/site.ts)
-//   shell/public/_site/<id>/themes.css  generated tokens, for a page that is not composed
 //   shell/public/_headers               one-year immutable caching for /_site/*
 //   shell/generated/build.json          { id, inline, scripts } read by the Worker
+//
+// The theme tokens are only inline (in build.json): a composed page needs no
+// stylesheet request for its first paint.
 //
 // <id> is a content hash of everything a composed page gets from this build, so
 // a release that changes any of it is a new URL. The newest KEEP builds stay in
@@ -41,13 +43,11 @@ const bundle = await esbuild({
   legalComments: 'none',
 });
 const siteJs = bundle.outputFiles[0].text;
-const themesCss = generateCss(THEMES);
 
-const id = createHash('sha256').update(inline).update('\0').update(siteJs).update('\0').update(themesCss).digest('hex').slice(0, 12);
+const id = createHash('sha256').update(inline).update('\0').update(siteJs).digest('hex').slice(0, 12);
 
 mkdirSync(new URL(`${id}/`, site), { recursive: true });
 writeFileSync(new URL(`${id}/site.js`, site), siteJs);
-writeFileSync(new URL(`${id}/themes.css`, site), themesCss);
 writeFileSync(
   new URL('public/_headers', shell),
   ['/_site/*', '  Cache-Control: public, max-age=31536000, immutable', '  X-Content-Type-Options: nosniff', ''].join('\n'),
@@ -71,4 +71,4 @@ writeFileSync(new URL('generated/build.json', shell), JSON.stringify({ id, inlin
 const base = THEMES.find((t) => t.id === BASE_THEME_ID)!;
 writeFileSync(new URL('generated/fallback.css', shell), `/* site-shell fallback: Classic Light when the shared tokens are missing. */\n${block(':where(:root)', base)}\n`);
 
-console.log(`site-shell build ${id}: inline ${Buffer.byteLength(inline)} B, site.js ${Buffer.byteLength(siteJs)} B, themes.css ${Buffer.byteLength(themesCss)} B; kept ${kept.join(', ')}`);
+console.log(`site-shell build ${id}: inline ${Buffer.byteLength(inline)} B, site.js ${Buffer.byteLength(siteJs)} B; kept ${kept.join(', ')}`);

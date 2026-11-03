@@ -3,9 +3,7 @@
 // Theme only for now: the inline boot script and the inline theme tokens go
 // first in <head> (after a leading <meta charset>, which must stay inside the
 // first 1024 bytes), followed by the deferred /_site/<build>/site.js that
-// defines <site-theme-picker>. <site-slot name="…"> elements are the slot
-// point for later shared parts (navigation); the registry is empty today, so
-// they pass through untouched.
+// defines <site-theme-picker>.
 
 export interface Build {
   /** Content hash of this release's assets; also the /_site/<id>/ directory. */
@@ -15,9 +13,6 @@ export interface Build {
   /** Files under /_site/<id>/ that every composed page loads (deferred scripts). */
   scripts: string[];
 }
-
-/** Slot name -> HTML that replaces <site-slot name="…">. Empty until a nav is chosen. */
-export type Slots = Record<string, string>;
 
 export interface ComposeOptions {
   /** Which app is calling; recorded in a response header for debugging. */
@@ -48,7 +43,7 @@ export function headMarkup(build: Build, assetBase = '/_site/'): string {
  * 200 HTML page. Validators are dropped: the body now depends on this build as
  * well as on the app's file, so the app's ETag no longer describes it.
  */
-export function composeResponse(res: Response, opts: ComposeOptions, build: Build, slots: Slots = {}): Response {
+export function composeResponse(res: Response, opts: ComposeOptions, build: Build): Response {
   if (!isHtml(res)) return res;
   if (!APP.test(opts.app)) throw new Error(`bad app: ${opts.app}`);
   const markup = headMarkup(build, opts.assetBase);
@@ -68,7 +63,7 @@ export function composeResponse(res: Response, opts: ComposeOptions, build: Buil
     else el.before(markup, { html: true });
   };
 
-  let rewriter = new HTMLRewriter()
+  return new HTMLRewriter()
     .on('head > *', { element: guard(insertNear) })
     .on('head', {
       element: guard((el: Element) => {
@@ -78,18 +73,8 @@ export function composeResponse(res: Response, opts: ComposeOptions, build: Buil
           end.before(markup, { html: true });
         });
       }),
-    });
-
-  if (Object.keys(slots).length > 0) {
-    rewriter = rewriter.on('site-slot[name]', {
-      element: guard((el: Element) => {
-        const html = slots[el.getAttribute('name') ?? ''];
-        if (html !== undefined) el.replace(html, { html: true });
-      }),
-    });
-  }
-
-  return rewriter.transform(new Response(res.body, { status: res.status, statusText: res.statusText, headers }));
+    })
+    .transform(new Response(res.body, { status: res.status, statusText: res.statusText, headers }));
 }
 
 /**

@@ -130,17 +130,18 @@ jobs:
         env:
           URL: ${{ steps.preview.outputs.url || steps.deploy.outputs.url }}
         run: |
+          # Only a version carrying this build has /_site/<id>/; until it is live the path is a 404.
           id=$(node -p "require('./shell/generated/build.json').id")
           for _ in 1 2 3 4 5 6; do
-            if curl -fsS "$URL/_site/build.json" | grep -q "\"$id\""; then
-              curl -fsSI "$URL/_site/$id/site.js" | grep -qi 'cache-control: public, max-age=31536000, immutable' \
+            if headers=$(curl -fsSI "$URL/_site/$id/site.js"); then
+              printf '%s\n' "$headers" | grep -qi 'cache-control: public, max-age=31536000, immutable' \
                 || { echo "::error::$URL/_site/$id/site.js is not served immutable"; exit 1; }
               echo "$URL serves build $id"
               exit 0
             fi
             sleep 10
           done
-          echo "::error::$URL does not report build $id"
+          echo "::error::$URL does not serve /_site/$id/site.js"
           exit 1
 
       - name: Comment the preview URL (PR)

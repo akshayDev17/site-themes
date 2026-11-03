@@ -12,20 +12,11 @@ import build from './generated/build.json';
 
 export interface Env {
   ASSETS: Fetcher;
-  /**
-   * Set to '/_site/' once akshayprabhakant.com/_site/* routes here: every app's
-   * pages then load the shared files from one URL, with no app change.
-   */
-  ASSET_BASE?: string;
 }
 
 export default class SiteShell extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-    if (url.pathname === '/_site/build.json') {
-      return Response.json({ id: build.id }, { headers: { 'cache-control': 'no-store' } });
-    }
-    if (url.pathname.startsWith('/_site/')) {
+    if (new URL(request.url).pathname.startsWith('/_site/')) {
       const res = await this.env.ASSETS.fetch(request);
       // _headers marks everything under /_site/* immutable for a year, the
       // asset layer's 404 included; a build that is not here (yet) must not
@@ -36,6 +27,6 @@ export default class SiteShell extends WorkerEntrypoint<Env> {
   }
 
   async compose(response: Response, opts: ComposeOptions): Promise<Response> {
-    return composeResponse(response, { ...opts, assetBase: this.env.ASSET_BASE ?? opts.assetBase }, build as Build);
+    return composeResponse(response, opts, build as Build);
   }
 }

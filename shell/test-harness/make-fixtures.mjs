@@ -1,10 +1,12 @@
 // Builds the harness apps' asset directories (git-ignored) from the HTML and CSS
-// in fixtures/, saved from the live public pages on 2026-11-03, in two states:
+// in fixtures/. home, chat and atlas were saved from the live public pages on
+// 2026-11-03. quiz and graph sit behind Access, so quiz.html and graph.html are
+// the index pages of a local static build (`npm ci && npm run build` in
+// frontend/) of quiz-app 6579d3c and graph-notes f9399ec, origin/main on
+// 2026-11-03. Chat is served in two states:
 // - as today: each page carries its own bundled boot script and tokens;
 // - migrated: boot script and bundled tokens removed (what an app ships after
 //   its site-shell PR), so the theme can only come from compose().
-// quiz and graph sit behind Access, so the graph page is a schematic built from
-// the chat page's markup with graph's /graph basePath, manifest link and SW.
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,7 +34,7 @@ const stripTokens = (css) => {
 
 const chatHtml = read('chat.html');
 const chatCss = read('css/060d43116cea3511.css');
-for (const name of ['chat', 'chat-migrated', 'graph', 'atlas']) rmSync(join(apps, name, name === 'atlas' ? 'dist' : 'out'), { recursive: true, force: true });
+for (const name of ['home', 'chat', 'chat-migrated', 'quiz', 'graph', 'atlas']) rmSync(join(apps, name, name === 'atlas' ? 'dist' : 'out'), { recursive: true, force: true });
 
 // chat, as today
 put(join(apps, 'chat/out/chat-archives.html'), withProbe(chatHtml));
@@ -54,16 +56,15 @@ put(join(apps, 'chat-migrated/out/_next/static/css/060d43116cea3511.css'), strip
 const FALLBACK = readFileSync(join(here, '../generated/fallback.css'), 'utf8').trim();
 put(join(apps, 'chat-migrated/out/chat-archives/with-fallback.html'), migrated.replace('</head>', `<style>${FALLBACK}</style></head>`));
 
-// graph (schematic), migrated
-const graph = migrated
-  .replaceAll('"/_next/', '"/graph/_next/')
-  .replace('<title>The AI Digest</title>', '<title>Graph notes</title>')
-  .replace('</head>', '<link rel="manifest" href="/graph/manifest.webmanifest" crossorigin="use-credentials"/></head>')
-  .replace('</body>', `<script>navigator.serviceWorker&&navigator.serviceWorker.register('/graph/sw.js',{scope:'/graph/'})</script></body>`);
-put(join(apps, 'graph/out/index.html'), graph);
-put(join(apps, 'graph/out/_next/static/css/060d43116cea3511.css'), stripTokens(chatCss));
-const files = ['/graph/', '/graph/_next/static/css/060d43116cea3511.css'];
-put(join(apps, 'graph/out/sw.js'), readFileSync(join(here, 'sw-proposed.js'), 'utf8').replace("'__VERSION__'", "'v1'").replace('__FILES__', JSON.stringify(files)));
+// home, as today, at the root
+put(join(apps, 'home/out/index.html'), read('home.html'));
+
+// quiz, as today
+put(join(apps, 'quiz/out/index.html'), read('quiz.html'));
+
+// graph, as today, with the proposed service worker
+put(join(apps, 'graph/out/index.html'), read('graph.html'));
+put(join(apps, 'graph/out/sw.js'), readFileSync(join(here, 'sw-proposed.js'), 'utf8').replace("'__VERSION__'", "'v1'").replace('__FILES__', JSON.stringify(['/graph/'])));
 
 // atlas, as today (bundled), at its full public path
 for (const [file, page] of [['atlas.html', 'index.html'], ['atlas-state.html', 'state/index.html']]) {

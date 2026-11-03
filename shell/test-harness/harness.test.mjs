@@ -22,7 +22,6 @@ const app = (name) => `shell/test-harness/apps/${name}/wrangler.jsonc`;
 const SHELL = 'shell/wrangler.jsonc';
 const THROWING_SHELL = 'shell/test-harness/shell-throw.jsonc';
 const MIDSTREAM_SHELL = 'shell/test-harness/shell-midstream.jsonc';
-const ROUTED_SHELL = 'shell/test-harness/shell-routed.jsonc';
 let nextPort = 18801;
 
 /**
@@ -67,18 +66,29 @@ async function outcome(url) {
 const asBuilt = (p) => readFileSync(join(here, 'apps', p), 'utf8');
 const META = '<meta charSet="utf-8"/>';
 const markup = (base) => `${build().inline}<script defer src="${base}${build().id}/site.js"></script>`;
+/** The page as built plus the one insertion, right after its leading <meta charset>. */
+const composed = (asset, base, meta = META) => {
+  const page = asBuilt(asset);
+  assert.equal(page.split(meta).length, 2, `${asset} has one ${meta}`);
+  return page.replace(meta, meta + markup(base));
+};
+
+/** Fetches a composed page and checks it byte for byte. */
+async function assertComposed(s, path, appName, asset, base, meta = META) {
+  const res = await fetch(`${s.base}${path}`);
+  const body = await res.text();
+  assert.equal(res.status, 200, path);
+  assert.equal(res.headers.get('x-site-shell'), `${build().id}; app=${appName}`, path);
+  assert.equal(body, composed(asset, base, meta), `${path}: the page as built plus one insertion`);
+  assert.ok(body.indexOf(meta) < 1024, `${path}: <meta charset> stays inside the first 1024 bytes`);
+}
 
 test('chat (as today): compose inserts the head markup after <meta charset> and changes nothing else', async (t) => {
   const s = await session(t, [app('chat'), SHELL]);
+  await assertComposed(s, '/chat-archives', 'chat', 'chat/out/chat-archives.html', '/chat-archives/_site/');
   const res = await fetch(`${s.base}/chat-archives`);
-  const body = await res.text();
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get('x-site-shell'), `${build().id}; app=chat`);
   assert.equal(res.headers.get('etag'), null, 'composed HTML carries no validator');
-  const expected = asBuilt('chat/out/chat-archives.html').replace(META, META + markup('/chat-archives/_site/'));
-  assert.equal(body, expected, 'byte for byte: the page as built plus one insertion');
-  assert.ok(body.indexOf(META) < 1024, '<meta charset> stays inside the first 1024 bytes');
-  assert.equal(body.match(/data-site-shell/g).length, 2, 'one boot <script> and one tokens <style>');
+  assert.equal((await res.text()).match(/data-site-shell/g).length, 2, 'one boot <script> and one tokens <style>');
 
   // Anything that is not HTML passes through untouched, validators and 304 included.
   const css = await fetch(`${s.base}/_next/static/css/060d43116cea3511.css`);
@@ -157,14 +167,23 @@ test('a fault after the response has started streaming cannot fall back (500 KB 
   assert.equal(r.complete, false, 'never the full page');
 });
 
+test('home: the saved homepage (<meta charset="utf-8">) gets the head markup after its charset and nothing else', async (t) => {
+  const s = await session(t, [app('home'), SHELL]);
+  await assertComposed(s, '/', 'home', 'home/out/index.html', '/_site/', '<meta charset="utf-8">');
+});
+
+test('quiz: /quiz/ composed byte for byte, /quiz/_site/ forwarded', async (t) => {
+  const s = await session(t, [app('quiz'), SHELL]);
+  await assertComposed(s, '/quiz/', 'quiz', 'quiz/out/index.html', '/quiz/_site/');
+  assert.equal((await fetch(`${s.base}/quiz/_site/${build().id}/site.js`)).status, 200);
+});
+
 test('atlas: run_worker_first for the four pages composes the HTML; other files stay static', async (t) => {
   const s = await session(t, [app('atlas'), SHELL]);
-  for (const path of ['/elections/india/', '/elections/india/state/', '/elections/india/state/?s=IN-UP&y=2024']) {
-    const res = await fetch(`${s.base}${path}`);
-    const body = await res.text();
-    assert.equal(res.status, 200, path);
-    assert.equal(res.headers.get('x-site-shell'), `${build().id}; app=atlas`, path);
-    assert.ok(body.includes(`<script defer src="/elections/india/_site/${build().id}/site.js"></script>`), path);
+  const base = '/elections/india/_site/';
+  await assertComposed(s, '/elections/india/', 'atlas', 'atlas/dist/elections/india/index.html', base);
+  for (const path of ['/elections/india/state/', '/elections/india/state/?s=IN-UP&y=2024']) {
+    await assertComposed(s, path, 'atlas', 'atlas/dist/elections/india/state/index.html', base);
   }
   const moved = await fetch(`${s.base}/elections`, { redirect: 'manual' });
   assert.equal(moved.status, 308);
@@ -174,17 +193,9 @@ test('atlas: run_worker_first for the four pages composes the HTML; other files 
   assert.equal((await fetch(`${s.base}/elections/india/_site/${build().id}/site.js`)).status, 200);
 });
 
-test('graph: /graph/ composed, sw.js still no-cache, /graph/_site/ forwarded', async (t) => {
+test('graph: /graph/ composed byte for byte, sw.js still no-cache, /graph/_site/ forwarded', async (t) => {
   const s = await session(t, [app('graph'), SHELL]);
-  const res = await fetch(`${s.base}/graph/`);
-  assert.equal(res.status, 200);
-  assert.ok((await res.text()).includes(`<script defer src="/graph/_site/${build().id}/site.js"></script>`));
+  await assertComposed(s, '/graph/', 'graph', 'graph/out/index.html', '/graph/_site/');
   assert.equal((await fetch(`${s.base}/graph/sw.js`)).headers.get('cache-control'), 'no-cache');
   assert.equal((await fetch(`${s.base}/graph/_site/${build().id}/site.js`)).status, 200);
-});
-
-test('ASSET_BASE on site-shell moves every app to /_site/ with no app change', async (t) => {
-  const s = await session(t, [app('graph'), ROUTED_SHELL]);
-  const body = await (await fetch(`${s.base}/graph/`)).text();
-  assert.ok(body.includes(`<script defer src="/_site/${build().id}/site.js"></script>`));
 });

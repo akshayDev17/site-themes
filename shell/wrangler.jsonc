@@ -8,7 +8,7 @@
   // No "routes": apps reach compose() over a Service Binding, which needs none.
   // akshayprabhakant.com/_site/* is proposed (owner decision D2-i), not approved.
   // workers.dev on, so a preview deploy answers at site-shell.<subdomain>.workers.dev
-  // (its /_site/<id>/… files and /_site/build.json) without touching the zone.
+  // (its /_site/<id>/… files) without touching the zone.
   "workers_dev": true,
   "preview_urls": true,
 
@@ -20,10 +20,6 @@
     "binding": "ASSETS"
     // No run_worker_first: /_site/<id>/… is served without running the Worker.
   },
-
-  // Once akshayprabhakant.com/_site/* is approved and routed here, every app's
-  // pages can load the shared files from that one URL:
-  // "vars": { "ASSET_BASE": "/_site/" },
 
   "observability": { "enabled": true }
 }

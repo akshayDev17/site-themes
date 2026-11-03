@@ -192,19 +192,19 @@ An app's Worker hands each HTML response to site-shell over a Service Binding: `
 2. the theme tokens, inline (`:root,[data-theme="classic-light"]{…}[data-theme="classic-dark"]{…}`), so even a first visit has no flash and no extra request;
 3. `<script defer src="<assetBase><build>/site.js">`, which defines `<site-theme-picker>`. The app keeps placing the element itself.
 
-Nothing else in the page changes. Responses that are not `200 text/html` pass through untouched. Composed pages drop `ETag` and `Last-Modified`, because the page now depends on the site-shell build too, and carry `x-site-shell: <build>; app=<app>`. `<site-slot name="…">` elements are the slot point for later shared parts; no slot is filled today.
+Nothing else in the page changes. Responses that are not `200 text/html` pass through untouched. Composed pages drop `ETag` and `Last-Modified`, because the page now depends on the site-shell build too, and carry `x-site-shell: <build>; app=<app>`.
 
 ### Files at /_site/\<build\>/
 
-`npm run build` writes `shell/public/_site/<build>/site.js` and `themes.css`, where `<build>` is a content hash of everything a composed page gets from that build. `shell/public/_headers` serves them with `Cache-Control: public, max-age=31536000, immutable`. The newest 3 builds are kept, so a page composed just before a deploy still finds its files. A missing build answers `404` with `no-store`, so it is never cached as missing.
+`npm run build` writes `shell/public/_site/<build>/site.js`, where `<build>` is a content hash of everything a composed page gets from that build. There is no stylesheet: the tokens are inline in the composed page, so its first paint needs no request. `shell/public/_headers` serves them with `Cache-Control: public, max-age=31536000, immutable`. The newest 3 builds are kept, so a page composed just before a deploy still finds its files. A missing build answers `404` with `no-store`, so it is never cached as missing.
 
-Until `akshayprabhakant.com/_site/*` is routed to site-shell, each app forwards `<its prefix>/_site/…` to `env.SHELL.fetch()` through its own route, and passes that prefix as `assetBase`. Once the route exists, setting `"vars": { "ASSET_BASE": "/_site/" }` in `shell/wrangler.jsonc` moves every app to the shared URL with one deploy and no app change.
+Until `akshayprabhakant.com/_site/*` is routed to site-shell, each app forwards `<its prefix>/_site/…` to `env.SHELL.fetch()` through its own route, and passes that prefix as `assetBase`.
 
 ### Wiring an app
 
 1. **Deploy order:** site-shell must be deployed before an app adds the binding, or the app's deploy fails.
 2. In the app's `wrangler.jsonc`: `"services": [{ "binding": "SHELL", "service": "site-shell" }]`. The election atlas also lists its four HTML pages and `/elections/india/_site/*` in `assets.run_worker_first`.
-3. In the app's Worker, pass each page through this hook, and forward `/_site/` (see `shell/test-harness/apps/` for the chat, graph and atlas Workers with the hook in place):
+3. In the app's Worker, pass each page through this hook, and forward `/_site/` (see `shell/test-harness/apps/` for the chat, quiz, graph and atlas Workers with the hook in place):
 
    ```js
    // Fail open: unbound, failing or unreachable site-shell serves the page exactly as built.
@@ -259,11 +259,11 @@ Until both secrets exist, the job reports a notice, skips everything after its c
 ```sh
 npm test                                        # includes the site-shell build, its unit tests and the Worker typecheck
 node shell/test-harness/make-fixtures.mjs       # harness apps' asset dirs from shell/test-harness/fixtures/
-npm run test:shell                              # wrangler dev sessions: app Workers + site-shell, fail-open cases, atlas, graph
+npm run test:shell                              # wrangler dev sessions: each app's page composed byte for byte, fail-open cases
 npm run dev:shell                               # site-shell alone on localhost
 ```
 
-The harness runs on local workerd with no Cloudflare account. Each scenario is one `wrangler dev -c <app> -c <shell>` session with a private dev registry, because otherwise a site-shell left running by any other session would answer the binding. The fixtures are the public pages' HTML and CSS saved on 2026-11-03; the graph page is a schematic, because that app sits behind Access. The boot string is built in Node by `scripts/build-shell.ts`, never by `Function#toString()` inside the Worker bundle: wrangler's default `keep_names` would put `__name(...)` calls inside it, and those calls do not exist in a browser.
+The harness runs on local workerd with no Cloudflare account. Each scenario is one `wrangler dev -c <app> -c <shell>` session with a private dev registry, because otherwise a site-shell left running by any other session would answer the binding. The homepage, chat and atlas fixtures are the public pages' HTML and CSS saved on 2026-11-03. Quiz and graph notes sit behind Access, so their fixtures are the index pages of a local static build of each app's `frontend/` from its `main` branch (see `make-fixtures.mjs`). The homepage has no Worker (GitHub Pages serves it), so its harness Worker stands in for one on the proposed `/` route. The boot string is built in Node by `scripts/build-shell.ts`, never by `Function#toString()` inside the Worker bundle: wrangler's default `keep_names` would put `__name(...)` calls inside it, and those calls do not exist in a browser.
 
 ## Changelog
 
