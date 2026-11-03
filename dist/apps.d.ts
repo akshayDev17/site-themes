@@ -1,13 +1,13 @@
 export interface App {
     /** What the app's Worker passes as compose({ app }). */
     id: string;
-    /** The name the switcher and the homepage list show, in sentence case. */
+    /** The name the site row and the homepage list show, in sentence case. */
     label: string;
     /** The app's root on akshayprabhakant.com: a path starting with '/'. */
     path: string;
-    /** One line under the name in the phone sheet and the homepage list. */
+    /** One line under the name in the homepage list. */
     blurb: string;
-    /** Behind Cloudflare Access: shown with a lock and "(invite-only, sign-in required)". */
+    /** Behind Cloudflare Access: screen readers hear "(sign-in required)" after its name. */
     gated: boolean;
     /** false = unlisted (see the top of this file). */
     listed: boolean;
