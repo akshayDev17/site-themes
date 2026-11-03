@@ -36,6 +36,8 @@ jobs:
         run: |
           node shell/test-harness/make-fixtures.mjs
           npm run test:shell
+      - name: site path phone sheet stays on the screen (headless Chrome, 390x844, overflowing page)
+        run: npm run test:sheet
       - name: Bundle site-shell exactly as a deploy would (nothing is uploaded)
         env:
           WRANGLER_SEND_METRICS: 'false'

@@ -84,7 +84,14 @@ const PATH_CSS = [
   '.sp-short{display:none!important}',
   '@media (max-width:900px){.sp-long{display:none!important}.sp-short{display:inline-flex!important;justify-content:flex-start}}',
   '@media (max-width:640px){.sp-apps{display:none!important}.sp-pill{display:inline-flex}.sp-crumb:not(:last-child){display:none}}',
-  '.sp-sheet{position:fixed;inset:auto 0 0 0;box-sizing:border-box;width:100%;max-width:none;max-height:85dvh;margin:0;padding:.5rem 1rem calc(1rem + env(safe-area-inset-bottom,0px));overflow:auto;border:1px solid var(--card-line);border-bottom:0;border-radius:16px 16px 0 0;background:var(--card);color:var(--text);box-shadow:var(--shadow-hover);font:400 15px/1.3 var(--font-serif,Georgia,serif)}',
+  // The sheet is held to the screen (the visual viewport), not the layout viewport:
+  // on a phone, a page wider than the screen grows the layout viewport past the
+  // screen in both directions, and a sheet pinned to it (inset 0, width 100%) runs
+  // off the screen's right edge and below its bottom, Close and all. 100vw and
+  // 100dvh stay the screen's size, so this rule fits the sheet to the screen while
+  // the page is not panned (min() and max() keep a desktop scrollbar out of it);
+  // site.js then follows the visual viewport as it pans and zooms.
+  '.sp-sheet{position:fixed;inset:auto auto max(0px,100% - 100dvh) 0;box-sizing:border-box;width:min(100%,100vw);max-width:none;max-height:85dvh;margin:0;padding:.5rem 1rem calc(1rem + env(safe-area-inset-bottom,0px));overflow:auto;border:1px solid var(--card-line);border-bottom:0;border-radius:16px 16px 0 0;background:var(--card);color:var(--text);box-shadow:var(--shadow-hover);font:400 15px/1.3 var(--font-serif,Georgia,serif)}',
   '.sp-sheet::backdrop{background:rgb(0 0 0/.4)}',
   '.sp-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-bottom:.25rem}',
   '.sp-sheet-head a{display:inline-flex;align-items:center;min-height:44px;color:var(--text-muted);text-decoration:none}',

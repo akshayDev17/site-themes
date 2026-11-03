@@ -190,7 +190,7 @@ An app's Worker hands each HTML response to site-shell over a Service Binding: `
 
 1. the boot script, inline (the same one the package exports), so `<html data-theme>` is set before first paint;
 2. the theme tokens, inline (`:root,[data-theme="classic-light"]{…}[data-theme="classic-dark"]{…}`), so even a first visit has no flash and no extra request;
-3. `<script defer src="<assetBase><build>/site.js">`, which defines `<site-theme-picker>` (the app keeps placing the element itself) and opens the site path's sheet in browsers without invoker commands.
+3. `<script defer src="<assetBase><build>/site.js">`, which defines `<site-theme-picker>` (the app keeps placing the element itself), opens the site path's sheet in browsers without invoker commands, and holds that sheet to the screen (the visual viewport).
 4. on an [unlisted](#the-app-list) app's pages only: `<meta name="robots" content="noindex">`.
 
 It also fills two elements an app may place in its body, from the [app list](#the-app-list):
@@ -204,7 +204,7 @@ It also fills two elements an app may place in its body, from the [app list](#th
 - **A page with no slot gets no navigation at all**, so an app that has not placed one is unchanged.
 - Each slot carries its own small `<style>`; there is no extra request. The path is Newsreader (`--font-serif`) at 15 px in sentence case, uses only theme tokens, and marks the current app in `--text`, never the accent. Every link and button is at least 44 px tall; the phone button is drawn 34 px tall with a 44 px tap area.
 - The accessible names start with the visible text: the site name is "akshayprabhakant.com home" (or "AP, akshayprabhakant.com home" where it reads "AP"), the phone button "<app>, switch app" (its chevron is `aria-hidden`), and a gated app reads "<app> (invite-only, sign-in required)" next to an `aria-hidden` lock.
-- The bottom sheet is a modal `<dialog>` opened and closed by invoker commands (`<button commandfor command="show-modal">`) and light-dismissed by `closedby="any"`, so it needs no JavaScript in browsers that support them. `site.js` does both in browsers that do not.
+- The bottom sheet is a modal `<dialog>` opened and closed by invoker commands (`<button commandfor command="show-modal">`) and light-dismissed by `closedby="any"`, so it needs no JavaScript in browsers that support them. `site.js` does both in browsers that do not. The sheet is held to the screen (the visual viewport), not the layout viewport, so it stays fully on a phone's screen, Close included, even on a page wider than the screen: its CSS fits it to the screen while the page is not panned, and `site.js` follows the visual viewport as the page is panned or zoomed. `npm run test:sheet` checks this in headless Chrome at 390x844 on an overflowing page (`CHROME_PATH` picks the browser).
 - Each slot name is filled once per page. An unknown slot name, an app id missing from the list, or a malformed `data-tail` leaves the slot as the app wrote it (the last one logs `site-shell: handler skipped`).
 - In a React app, hydration must not replace the slot's content. Render the slot with `dangerouslySetInnerHTML` (the fallback) and `suppressHydrationWarning`, then check the page after hydration.
 
