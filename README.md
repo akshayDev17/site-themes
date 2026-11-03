@@ -57,7 +57,7 @@ Do not redefine the package's own names (`--accent`, `--card`, `--text`, …) in
 
 - One `localStorage` key, **`site-theme`**, on the single origin `https://akshayprabhakant.com`. Its value is `system` (the default) or a theme id. Every app on the origin reads the same key, so a choice made in one app carries over to the next with no signal between apps.
 - **System** maps to `classic-light` or `classic-dark` through `prefers-color-scheme`, and follows OS changes live.
-- An unknown stored id falls back to System, for example a theme removed in a later release or a typo. So do a missing key and storage that is missing or throws. The Slate themes (`slate-light`, `slate-dark`) were removed in 0.2.0, so a stored slate id now lands on System with no flash and no error.
+- An unknown stored id falls back to System, for example a theme removed in a later release or a typo. So do a missing key and storage that is missing or throws. See the [Changelog](#changelog) for removed theme ids.
 - Open tabs follow a change through the `storage` event. Pickers on the same page stay in sync through a `site-theme-change` window event.
 - `data-theme` always holds the resolved theme id. In System mode that is `classic-light` or `classic-dark`, never `system`.
 
