@@ -9,10 +9,11 @@ export declare function readThemeChoice(w?: Win): string;
  */
 export declare function setThemeChoice(choice: string, w?: Win): string;
 /**
- * Registers <site-theme-picker> on `w` (once). Attributes:
+ * Registers <site-theme-picker> on `w` (once): a select-only combobox (WAI-ARIA
+ * APG) listing System plus every catalogue theme. Attributes:
  * - `label`: visible label text (default "Theme");
  * - `hide-label`: keep the label for screen readers only.
- * Shadow parts `label` and `select` can be styled with ::part().
+ * Shadow parts `label` and `select` (the control) can be styled with ::part().
  */
 export declare function defineThemePicker(w?: Win): void;
 export {};

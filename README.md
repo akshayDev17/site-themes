@@ -144,10 +144,14 @@ The page serves its own copy. No other app links to it.
 
 ## Picker
 
-`<site-theme-picker>` is a labelled native `<select>` that lists System plus every catalogue theme. It is keyboard accessible and at least 24 px tall. It styles itself from the tokens.
+`<site-theme-picker>` is a labelled select-only combobox (the [WAI-ARIA APG pattern](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/examples/combobox-select-only/)) that lists System plus every catalogue theme. It is at least 24 px tall and styles itself from the tokens.
 
+- The control: the current choice and a chevron, the chevron 11 px in from the right edge and vertically centred, the text kept 8 px clear of it. It is as wide as its longest label whatever the choice, so nothing around it moves when the theme changes.
+- The open list is drawn by the element, not the browser, so it looks the same in every theme and browser. It uses the control's font, size, letter spacing, colours, radius and border (an app's `::part(select)` type carries over), and opens just under the control (above it when there is no room). The option under the pointer or keyboard gets a wash of `--text` in `--card` plus a 2 px `--focus` ring, which reaches 3:1 on the list in every theme; in forced-colors mode it is a `Highlight` outline instead. The chosen option carries a check mark.
+- Keyboard: Down, Up, Enter or Space opens the list on the chosen option, and Home or End opens it on the first or last option. With the list open, the arrows, Home/End and PageUp/PageDown move the highlight. Enter or Space chooses and closes, Escape closes without choosing, and Tab chooses and moves on. Typing a label's first letters jumps to it. Focus stays on the control throughout, and `aria-activedescendant` names the highlighted option. A press outside closes the list.
+- A click on the label focuses the control, as it would a native `<select>`.
 - Attributes: `label="…"` sets the label text (default "Theme"). `hide-label` keeps the label for screen readers only.
-- Styling: use `site-theme-picker::part(select)` and `::part(label)`.
+- Styling: use `site-theme-picker::part(select)` (the control) and `::part(label)`. The open list takes its look from the control.
 - Importing the module does not touch the DOM, so server-side rendering is safe. Call `defineThemePicker()` on the client. The React wrapper does this in an effect.
 
 ## Contrast gate
@@ -161,7 +165,7 @@ CI computes WCAG contrast for every theme and fails below the thresholds in repo
 | cardLine | surface, card | 3:1 |
 | focus | surface, surface2, card | 3:1 |
 
-A card's border separates the card from the page it sits on, so `cardLine` is gated against `surface` and `card` only, not `surface2`. A card or control bordered with `--card-line` that sits on `surface2` must carry a `--card` background. The picker's `<select>` always does. `line` and `lineStrong` are decorative dividers and exempt. Run the gate locally with `npm run check:contrast`. It prints every pair.
+A card's border separates the card from the page it sits on, so `cardLine` is gated against `surface` and `card` only, not `surface2`. A card or control bordered with `--card-line` that sits on `surface2` must carry a `--card` background. The picker's control and its open list always do. `line` and `lineStrong` are decorative dividers and exempt. Run the gate locally with `npm run check:contrast`. It prints every pair.
 
 ## Adding a theme
 
@@ -313,6 +317,7 @@ Until both secrets exist, the job reports a notice, skips everything after its c
 npm test                                        # includes the site-shell build, its unit tests and the Worker typecheck
 node shell/test-harness/make-fixtures.mjs       # harness apps' asset dirs from shell/test-harness/fixtures/
 npm run test:shell                              # wrangler dev sessions: each app's page composed byte for byte, fail-open cases
+npm run test:picker                             # the theme picker in headless Chrome, both themes (PICKER_SHOTS_DIR keeps the open-list PNGs)
 npm run dev:shell                               # site-shell alone on localhost
 ```
 
@@ -320,7 +325,7 @@ The harness runs on local workerd with no Cloudflare account. Each scenario is o
 
 ## Changelog
 
-- **Unreleased**: the site path becomes the plain site row, `Home  AI Digest  Quiz Room  Graph Notes  Election Atlas` (the homepage is labelled "Home"), with no site name, no "/ Portfolio" crumb and no phone sheet: the page's trail is its own line under the row, the row scrolls sideways where it does not fit, and no lock is drawn (gated apps keep a hidden "(sign-in required)"). Election Atlas links to `/elections/` ("Election results by country") and is the current app on every `/elections/…` page. Earlier: `/_site/apps.json`, the listed apps as JSON for the bare GitHub Pages homepage (`/?…`, `/index.html`). Earlier: the app list (`src/apps.ts`), and compose() fills `<site-slot name="site-path">` with the site path switcher and `<site-slot name="site-apps">` with the homepage list; an unlisted app's pages are `noindex`. Pages without a slot are unchanged. Earlier: site-shell is routed at `akshayprabhakant.com/_site/*` (composed pages load `/_site/<build>/` through `ASSET_BASE`) and the exact `akshayprabhakant.com/`, where it composes the GitHub Pages homepage and fails open to Pages. Earlier: added site-shell (`shell/`, `scripts/build-shell.ts`), the theme-only composition Worker. The package's exports are unchanged (`dist/` gains `apps.js`, which is not exported), so no tag is needed.
+- **Unreleased**: the picker is a custom select-only combobox instead of a native `<select>`, so its open list matches the control in every theme and browser, and its chevron has proper inner padding. Earlier: the site path becomes the plain site row, `Home  AI Digest  Quiz Room  Graph Notes  Election Atlas` (the homepage is labelled "Home"), with no site name, no "/ Portfolio" crumb and no phone sheet: the page's trail is its own line under the row, the row scrolls sideways where it does not fit, and no lock is drawn (gated apps keep a hidden "(sign-in required)"). Election Atlas links to `/elections/` ("Election results by country") and is the current app on every `/elections/…` page. Earlier: `/_site/apps.json`, the listed apps as JSON for the bare GitHub Pages homepage (`/?…`, `/index.html`). Earlier: the app list (`src/apps.ts`), and compose() fills `<site-slot name="site-path">` with the site path switcher and `<site-slot name="site-apps">` with the homepage list; an unlisted app's pages are `noindex`. Pages without a slot are unchanged. Earlier: site-shell is routed at `akshayprabhakant.com/_site/*` (composed pages load `/_site/<build>/` through `ASSET_BASE`) and the exact `akshayprabhakant.com/`, where it composes the GitHub Pages homepage and fails open to Pages. Earlier: added site-shell (`shell/`, `scripts/build-shell.ts`), the theme-only composition Worker. The package's exports are unchanged (`dist/` gains `apps.js`, which is not exported), so no tag is needed.
 - **0.2.0**: removed the Slate Light (`slate-light`) and Slate Dark (`slate-dark`) themes. The catalogue is now Classic Light and Classic Dark, with System as the default. A stored slate id falls back to System (Classic Light or Classic Dark through `prefers-color-scheme`). Every export and token name is unchanged, so an app bumps with no code change.
 - **0.1.0**: first release, with Classic Light, Classic Dark, Slate Light and Slate Dark.
 

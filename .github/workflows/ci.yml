@@ -38,6 +38,8 @@ jobs:
           npm run test:shell
       - name: site row and trail at 1440, 1280, 844x390 and 390x844 in both themes (headless Chrome)
         run: npm run test:row
+      - name: theme picker in both themes (headless Chrome; chevron padding, open list, keyboard, pointer)
+        run: npm run test:picker
       - name: Bundle site-shell exactly as a deploy would (nothing is uploaded)
         env:
           WRANGLER_SEND_METRICS: 'false'
