@@ -26,10 +26,10 @@ name: site-shell
 
 on:
   pull_request:
-    paths: ['src/**', 'shell/**', 'scripts/build-shell.ts', 'package.json', 'package-lock.json', '.github/workflows/site-shell.yml']
+    paths: ['src/**', 'shell/**', 'scripts/build-shell.ts', 'scripts/check-routes.ts', 'package.json', 'package-lock.json', '.github/workflows/site-shell.yml']
   push:
     branches: [main]
-    paths: ['src/**', 'shell/**', 'scripts/build-shell.ts', 'package.json', 'package-lock.json', '.github/workflows/site-shell.yml']
+    paths: ['src/**', 'shell/**', 'scripts/build-shell.ts', 'scripts/check-routes.ts', 'package.json', 'package-lock.json', '.github/workflows/site-shell.yml']
   workflow_dispatch:
 
 permissions:
@@ -162,6 +162,12 @@ jobs:
               printf '%s\n' "$headers" | grep -qi 'cache-control: public, max-age=31536000, immutable' \
                 || { echo "::error::$URL/_site/$id/site.js is not served immutable"; exit 1; }
               echo "$URL serves build $id"
+              miss=$(curl -sSI "$URL/_site/000000000000/site.js") || { echo "::error::could not fetch a missing /_site/ file from $URL"; exit 1; }
+              printf '%s\n' "$miss" | head -1 | grep -q ' 404' \
+                || { echo "::error::$URL/_site/000000000000/site.js is not a 404"; exit 1; }
+              printf '%s\n' "$miss" | grep -qi 'cache-control: no-store' \
+                || { echo "::error::$URL answers a missing /_site/ file without cache-control: no-store"; exit 1; }
+              echo "$URL answers a missing /_site/ file 404 no-store"
               exit 0
             fi
             sleep 10
@@ -174,6 +180,10 @@ jobs:
         # protection answers GitHub's runners with 403. Asserts that site-shell
         # owns exactly the routes shell/wrangler.jsonc lists (the exact / and
         # /_site/*) and nothing else. The token is sent only as a header.
+        # Whether / is composed by this build (x-site-shell: <id>; app=home)
+        # can only be seen from outside the bot protection, so CI does not
+        # check it: the owner's live check after each phase does. The homepage
+        # fails open, so a broken compose still serves Pages unchanged.
         if: steps.deploy.outputs.url
         run: node build/scripts/check-routes.js shell/wrangler.jsonc
 
