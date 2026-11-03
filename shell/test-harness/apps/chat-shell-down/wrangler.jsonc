@@ -1,0 +1,9 @@
+{
+  "name": "ai-chat-archive-frontend",
+  "main": "../chat/worker.js",
+  "compatibility_date": "2026-10-10",
+  "workers_dev": false,
+  // bound, but run without site-shell in the session (or with a faulty one)
+  "assets": { "directory": "../chat-migrated/out", "binding": "ASSETS", "run_worker_first": true },
+  "services": [{ "binding": "SHELL", "service": "site-shell" }]
+}

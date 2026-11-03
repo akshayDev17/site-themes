@@ -18,15 +18,25 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Build and unit tests
+      - name: Build and unit tests (package, site-shell build, Worker typecheck)
         run: npm test
       - name: Contrast gate (report section 3.5.5 thresholds)
         run: npm run check:contrast
-      - name: Committed dist/ matches the catalogue
+      - name: Committed dist/ and site-shell build match the catalogue
         run: |
-          if [ -n "$(git status --porcelain -- dist)" ]; then
-            git status --short -- dist
-            git diff -- dist
-            echo "::error::dist/ is stale. Run 'npm run build' and commit dist/."
+          if [ -n "$(git status --porcelain -- dist shell/generated shell/public)" ]; then
+            git status --short -- dist shell/generated shell/public
+            git diff -- dist shell/generated shell/public
+            echo "::error::dist/ or the site-shell build is stale. Run 'npm run build' and commit dist/, shell/generated/ and shell/public/."
             exit 1
           fi
+      - name: site-shell harness (wrangler dev on local workerd; no Cloudflare account)
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          node shell/test-harness/make-fixtures.mjs
+          npm run test:shell
+      - name: Bundle site-shell exactly as a deploy would (nothing is uploaded)
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/site-shell" -c shell/wrangler.jsonc

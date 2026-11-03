@@ -1,0 +1,8 @@
+{
+  "name": "ai-chat-archive-frontend",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-10",
+  "workers_dev": false,
+  "assets": { "directory": "../chat-migrated/out", "binding": "ASSETS", "run_worker_first": true },
+  "services": [{ "binding": "SHELL", "service": "site-shell" }]
+}

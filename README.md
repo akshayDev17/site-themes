@@ -1,8 +1,11 @@
 # site-themes
 
-Build-time shared themes for the akshayprabhakant.com apps (homepage, chat archive, quiz, graph notes, election atlas).
+Shared themes for the akshayprabhakant.com apps (homepage, chat archive, quiz, graph notes, election atlas), delivered two ways from one catalogue (`src/themes.ts`):
 
-**Build time only.** This package serves nothing and runs no service: no Worker, no route, no CDN. Each app installs a pinned git tag and bundles the themes into its own build, so nothing is fetched when a page loads. Theming therefore does not depend on the network, and an app never depends at runtime on another app or on the homepage.
+- **The build-time package** (`dist/`, everything up to [site-shell](#site-shell)). Each app installs a pinned git tag and bundles the themes into its own build, so nothing is fetched when a page loads. Every app uses it today.
+- **site-shell** (`shell/`), a Cloudflare Worker that adds the theme to each app's HTML as it streams out, so one release reaches every app at its next page view. It is not routed and no app binds it yet; see [site-shell](#site-shell).
+
+Installing the package from git still copies only `dist/` (`"files"` in `package.json`), so site-shell changes never reach an app through the package and need no tag.
 
 ## What it exports
 
@@ -175,8 +178,96 @@ The CSS, the boot script's id list and the picker's options all derive from the 
 - Each app sets up its bump automation in its own wiring PR. It does not live in this repository.
 - After a bump, the app rebuilds and redeploys. That is the only way a new theme reaches it, because nothing is fetched at runtime.
 
+## site-shell
+
+site-shell is the shared Worker that composes the theme into every app's HTML (theme only for now; navigation comes later). It is built from the same catalogue, boot script and picker as the package.
+
+**Status:** it has no route and no app binds it yet, so it serves no production traffic. `akshayprabhakant.com/_site/*` and the exact `/` route are proposals awaiting approval.
+
+### What compose() adds
+
+An app's Worker hands each HTML response to site-shell over a Service Binding: `env.SHELL.compose(response, { app, assetBase })`. site-shell streams it through `HTMLRewriter` and adds, as the first children of `<head>` (right after a leading `<meta charset>`, which must stay in the first 1024 bytes):
+
+1. the boot script, inline (the same one the package exports), so `<html data-theme>` is set before first paint;
+2. the theme tokens, inline (`:root,[data-theme="classic-light"]{…}[data-theme="classic-dark"]{…}`), so even a first visit has no flash and no extra request;
+3. `<script defer src="<assetBase><build>/site.js">`, which defines `<site-theme-picker>`. The app keeps placing the element itself.
+
+Nothing else in the page changes. Responses that are not `200 text/html` pass through untouched. Composed pages drop `ETag` and `Last-Modified`, because the page now depends on the site-shell build too, and carry `x-site-shell: <build>; app=<app>`.
+
+### Files at /_site/\<build\>/
+
+`npm run build` writes `shell/public/_site/<build>/site.js`, where `<build>` is a content hash of everything a composed page gets from that build. There is no stylesheet: the tokens are inline in the composed page, so its first paint needs no request. `shell/public/_headers` serves them with `Cache-Control: public, max-age=31536000, immutable`. The newest 3 released builds are kept, so a page composed just before a deploy still finds its files. Released means listed in `shell/generated/builds.txt` on `main` (at the branch's merge-base with `origin/main`), since only `main` deploys: a build appends its id to that list, so builds made on a branch, committed or not, never take a slot from a deployed build or push it out. A missing build answers `404` with `no-store`, so it is never cached as missing.
+
+Until `akshayprabhakant.com/_site/*` is routed to site-shell, each app forwards `<its prefix>/_site/…` to `env.SHELL.fetch()` through its own route, and passes that prefix as `assetBase`.
+
+### Wiring an app
+
+1. **Deploy order:** site-shell must be deployed before an app adds the binding, or the app's deploy fails.
+2. In the app's `wrangler.jsonc`: `"services": [{ "binding": "SHELL", "service": "site-shell" }]`. The election atlas also lists its four HTML pages and `/elections/india/_site/*` in `assets.run_worker_first`.
+3. In the app's Worker, pass each page through this hook, and forward `/_site/` (see `shell/test-harness/apps/` for the chat, quiz, graph and atlas Workers with the hook in place):
+
+   ```js
+   // Fail open: unbound, failing or unreachable site-shell serves the page exactly as built.
+   // The body went to site-shell with the call, so the fallback fetches the page again
+   // (a static asset: free). Returning the original response here answers 500 instead.
+   async function withShell(res, env, refetch, app, assetBase) {
+     const type = res.headers.get('content-type') || '';
+     if (!env.SHELL || res.status !== 200 || !type.startsWith('text/html')) return res;
+     try {
+       return await env.SHELL.compose(res, { app, assetBase });
+     } catch (err) {
+       console.error('site-shell: compose failed, serving the page as built:', String(err));
+       return refetch();
+     }
+   }
+   ```
+
+4. Copy `shell/generated/fallback.css` (Classic Light under `:where(:root)`) into the app's own CSS. The apps use tokens such as `--accent` and `--card` with no `var()` fallback. If compose is ever skipped, this block keeps the page in Classic Light, and it has zero specificity, so it never overrides a theme.
+5. When the app drops the package: remove `bootScript`, the `themes.css` import and `ThemePicker`, render `<site-theme-picker hide-label="">` directly, and remove the dependency and its bump automation.
+
+### Failure behaviour
+
+| Failure | The visitor gets |
+|---|---|
+| No `SHELL` binding, site-shell not deployed or unreachable, or `compose()` throws | the page exactly as built (after step 4, in Classic Light, with no picker) |
+| An edit throws while the page streams | that edit is skipped; every handler is guarded |
+| A platform fault after the response has started (for example a CPU limit) | an error or a cut-short page: no hook can recover once streaming has begun |
+
+### Releases
+
+A change to `src/` or `shell/` is one PR. CI builds and tests it, and the `site-shell` workflow uploads a preview version for the PR. Merging deploys it, and every app that binds `SHELL` serves it at its next page view. Roll back with `wrangler rollback`. **Do not tag for site-shell-only changes:** a tag opens a bump PR in every app still on the package.
+
+### Deploying site-shell
+
+`.github/workflows/site-shell.yml` has three triggers:
+- **PRs from this repository:** uploads a preview version (`wrangler versions upload --preview-alias pr-<n>`), which is not deployed. It answers at `https://pr-<n>-site-shell.<subdomain>.workers.dev`. Until the Worker exists, the run skips the upload with a notice; the first merge to `main` creates it.
+- **Pushes to `main`:** deploys (`wrangler deploy`), to workers.dev only.
+- **A manual run on `main`:** also deploys.
+
+It reads these from the GitHub environment `production`, which the owner manages:
+
+| Name | Kind | Value |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | environment secret | the Cloudflare deploy token the app repos use |
+| `CLOUDFLARE_ACCOUNT_ID` | environment secret | the account id the app repos use |
+| `WORKERS_DEV_SUBDOMAIN` | environment or repository variable | the account's workers.dev subdomain; the smoke test checks `https://site-shell.<subdomain>.workers.dev` |
+
+Until both secrets exist, the job reports a notice, skips everything after its check, and stays green; CI is unaffected. Once they exist, run the workflow on `main` (Actions → site-shell → Run workflow) to deploy without waiting for the next change.
+
+### Developing site-shell
+
+```sh
+npm test                                        # includes the site-shell build, its unit tests and the Worker typecheck
+node shell/test-harness/make-fixtures.mjs       # harness apps' asset dirs from shell/test-harness/fixtures/
+npm run test:shell                              # wrangler dev sessions: each app's page composed byte for byte, fail-open cases
+npm run dev:shell                               # site-shell alone on localhost
+```
+
+The harness runs on local workerd with no Cloudflare account. Each scenario is one `wrangler dev -c <app> -c <shell>` session with a private dev registry, because otherwise a site-shell left running by any other session would answer the binding. The homepage, chat and atlas fixtures are the public pages' HTML and CSS saved on 2026-11-03. Quiz and graph notes sit behind Access, so their fixtures are the index pages of a local static build of each app's `frontend/` from its `main` branch (see `make-fixtures.mjs`). The homepage has no Worker (GitHub Pages serves it), so its harness Worker stands in for one on the proposed `/` route. The boot string is built in Node by `scripts/build-shell.ts`, never by `Function#toString()` inside the Worker bundle: wrangler's default `keep_names` would put `__name(...)` calls inside it, and those calls do not exist in a browser.
+
 ## Changelog
 
+- **Unreleased**: added site-shell (`shell/`, `scripts/build-shell.ts`), the theme-only composition Worker. The package (`dist/`) is unchanged, so no tag is needed.
 - **0.2.0**: removed the Slate Light (`slate-light`) and Slate Dark (`slate-dark`) themes. The catalogue is now Classic Light and Classic Dark, with System as the default. A stored slate id falls back to System (Classic Light or Classic Dark through `prefers-color-scheme`). Every export and token name is unchanged, so an app bumps with no code change.
 - **0.1.0**: first release, with Classic Light, Classic Dark, Slate Light and Slate Dark.
 
@@ -188,4 +279,4 @@ npm test                 # build (tsc + generate dist/) and run unit tests (node
 npm run check:contrast   # the contrast gate
 ```
 
-Layout: `src/themes.ts` holds the catalogue, `src/css.ts` generates the CSS, `src/contrast.ts` holds the gate, `src/boot.ts` the head script, `src/picker.ts` the custom element and `src/react.ts` the wrapper. `scripts/` writes the non-TS outputs into `dist/`.
+Layout: `src/themes.ts` holds the catalogue, `src/css.ts` generates the CSS, `src/contrast.ts` holds the gate, `src/boot.ts` the head script, `src/picker.ts` the custom element and `src/react.ts` the wrapper. `scripts/` writes the non-TS outputs into `dist/` and site-shell's build into `shell/generated/` and `shell/public/`. `shell/` holds the site-shell Worker (`worker.ts`, `compose.ts`, `client/site.ts`, `wrangler.jsonc`) and its harness (`test-harness/`).

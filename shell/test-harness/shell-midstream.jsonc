@@ -1,0 +1,7 @@
+{
+  // Harness only: site-shell with a fault (faults/midstream.ts). Never deployed.
+  "name": "site-shell",
+  "main": "faults/midstream.ts",
+  "compatibility_date": "2026-10-10",
+  "assets": { "directory": "../public", "binding": "ASSETS" }
+}

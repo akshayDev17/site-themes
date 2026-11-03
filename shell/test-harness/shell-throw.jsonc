@@ -1,0 +1,7 @@
+{
+  // Harness only: site-shell with a fault (faults/throw.ts). Never deployed.
+  "name": "site-shell",
+  "main": "faults/throw.ts",
+  "compatibility_date": "2026-10-10",
+  "assets": { "directory": "../public", "binding": "ASSETS" }
+}
