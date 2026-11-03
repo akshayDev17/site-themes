@@ -126,3 +126,22 @@ test('without site.js (CSS alone), the unpanned sheet and Close are on the scree
   await p.settle();
   assertOnScreen(await p.measure(), 'CSS alone');
 });
+
+// Pinch-zoomed in, the screen is a narrower visual viewport (195 CSS px at 2x on
+// this phone) and site.js narrows the sheet to it; the sheet's head wraps so
+// Close stays on the screen rather than past its right edge.
+for (const scale of [1.5, 2]) {
+  test(`pinch-zoomed ${scale}x on an overflowing page, the sheet and Close are on the screen`, async (t) => {
+    const p = await openPhone(page('classic-light', true));
+    t.after(() => p.tab.close());
+    await p.tab.call('Input.synthesizePinchGesture', { x: 195, y: 400, scaleFactor: scale, gestureSourceType: 'touch' });
+    await p.settle();
+    const zoomed = await p.measure();
+    assert.ok(Math.abs(zoomed.vv.w - PHONE.width / scale) < 2, `the page is zoomed ${scale}x: ${JSON.stringify(zoomed.vv)}`);
+    await p.tapPill();
+    const m = await p.measure();
+    assertOnScreen(m, `pinch-zoomed ${scale}x`);
+    const sheetScroll = await p.tab.evaluate("(() => { const d = document.getElementById('site-path-sheet'); return d.scrollWidth - d.clientWidth })()");
+    assert.ok(sheetScroll <= 0, `the sheet does not scroll sideways (${sheetScroll}px)`);
+  });
+}

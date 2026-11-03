@@ -93,9 +93,13 @@ const PATH_CSS = [
   // site.js then follows the visual viewport as it pans and zooms.
   '.sp-sheet{position:fixed;inset:auto auto max(0px,100% - 100dvh) 0;box-sizing:border-box;width:min(100%,100vw);max-width:none;max-height:85dvh;margin:0;padding:.5rem 1rem calc(1rem + env(safe-area-inset-bottom,0px));overflow:auto;border:1px solid var(--card-line);border-bottom:0;border-radius:16px 16px 0 0;background:var(--card);color:var(--text);box-shadow:var(--shadow-hover);font:400 15px/1.3 var(--font-serif,Georgia,serif)}',
   '.sp-sheet::backdrop{background:rgb(0 0 0/.4)}',
-  '.sp-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-bottom:.25rem}',
+  // The head wraps when the screen is too narrow for the site name and even a 44 px
+  // Close side by side (pinch-zoomed in, say), Close keeping to the inline end, so it
+  // stays on the screen. Close's 44 px basis, growing to its natural width, keeps the
+  // head on one line wherever it fitted before.
+  '.sp-sheet-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.25rem 1rem;padding-bottom:.25rem}',
   '.sp-sheet-head a{display:inline-flex;align-items:center;min-height:44px;color:var(--text-muted);text-decoration:none}',
-  '.sp-close{min-height:44px;min-width:44px;padding:0 1rem;border:1px solid var(--card-line);border-radius:999px;background:var(--card);color:var(--text);font:inherit;cursor:pointer}',
+  '.sp-close{flex:1 0 44px;max-width:max-content;margin-inline-start:auto;min-height:44px;min-width:44px;padding:0 1rem;border:1px solid var(--card-line);border-radius:999px;background:var(--card);color:var(--text);font:inherit;cursor:pointer}',
   '.sp-sheet ul{margin:0;padding:0;list-style:none}',
   '.sp-sheet li a{display:grid;grid-template-columns:1fr auto;align-items:center;align-content:center;column-gap:1rem;row-gap:.1rem;min-height:58px;padding:.5rem .75rem;border-radius:var(--radius-card,.7rem);color:var(--text);text-decoration:none}',
   '.sp-sheet li a[aria-current]{background:var(--surface-2)}',
