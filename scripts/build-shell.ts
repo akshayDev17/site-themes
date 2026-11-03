@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { build as esbuild, transform } from 'esbuild';
+import { APPS, validateApps } from '../src/apps.js';
 import { buildBootScript } from '../src/boot.js';
 import { generateCss, themeDeclarations } from '../src/css.js';
 import { BASE_THEME_ID, THEMES } from '../src/themes.js';
@@ -29,6 +30,8 @@ const site = new URL('public/_site/', shell);
 // compacted, with the base theme's block shared by :root (as the apps' CSS
 // minifier already does with the bundled copy).
 generateCss(THEMES);
+// The app list compose() renders the site path and the homepage list from.
+validateApps(APPS);
 const block = (selector: string, t: (typeof THEMES)[number]) =>
   `${selector}{color-scheme:${t.scheme};${themeDeclarations(t).map(([k, v]) => `${k}:${v}`).join(';')}}`;
 const tokens = THEMES.map((t) => block(t.id === BASE_THEME_ID ? `:root,[data-theme="${t.id}"]` : `[data-theme="${t.id}"]`, t)).join('');

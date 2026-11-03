@@ -78,7 +78,10 @@ const composed = (asset, base, meta = META) => {
   return page.replace(meta, meta + markup(base));
 };
 
-/** Fetches a composed page and checks it byte for byte. */
+/**
+ * Fetches a composed page and checks it byte for byte. No saved fixture has a
+ * <site-slot>, so this also shows compose() adds no navigation to them.
+ */
 async function assertComposed(s, path, appName, asset, base, meta = META) {
   const res = await fetch(`${s.base}${path}`);
   const body = await res.text();
@@ -125,6 +128,29 @@ test('chat (as today): compose inserts the head markup after <meta charset> and 
     const text = await time(`/chat-archives/big${size}.txt`);
     t.diagnostic(`${size} KB page: composed ${html.toFixed(2)} ms, passed through ${text.toFixed(2)} ms, compose adds ${(html - text).toFixed(2)} ms (local wall clock)`);
   }
+});
+
+test('chat with a <site-slot name="site-path">: the slot\'s content becomes the site path; the rest is unchanged', async (t) => {
+  const s = await session(t, [app('chat'), SHELL]);
+  const res = await fetch(`${s.base}/chat-archives/slotted`);
+  const body = await res.text();
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('x-site-shell'), `${build().id}; app=chat`);
+  assert.equal(res.headers.get('x-robots-tag'), null, 'a listed app is indexed');
+
+  const open = `<site-slot name="site-path" data-tail='[{"label":"Front page"}]'>`;
+  const inner = (html) => html.slice(html.indexOf(open) + open.length, html.indexOf('</site-slot>'));
+  const filled = inner(body);
+  assert.ok(filled.startsWith('<style data-site-shell>'), 'the slot carries its own styles');
+  assert.match(filled, /<nav class="sp" aria-label="Site path">/);
+  assert.match(filled, /<span class="sp-here sp-page" aria-current="page">Front page<\/span>/);
+  assert.match(filled, /<a class="sp-app" href="\/chat-archives" aria-current="true"><span class="sp-label">AI Digest<\/span><\/a>/);
+  assert.match(filled, /<dialog id="site-path-sheet"/);
+  assert.ok(!filled.includes('← Akshay Prabhakant'), 'the fallback is replaced');
+
+  // Outside the slot: the page as built plus the head block, byte for byte.
+  const page = composed('chat/out/chat-archives/slotted.html', '/_site/');
+  assert.equal(body.replace(filled, ''), page.replace(inner(page), ''));
 });
 
 test('chat (unbound): with no SHELL binding the page is served exactly as built', async (t) => {

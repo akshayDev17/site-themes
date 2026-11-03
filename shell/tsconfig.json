@@ -11,5 +11,5 @@
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": ["worker.ts", "compose.ts", "generated/build.json", "test-harness/faults/*.ts"]
+  "include": ["worker.ts", "compose.ts", "nav.ts", "generated/build.json", "test-harness/faults/*.ts"]
 }
