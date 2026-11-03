@@ -50,9 +50,27 @@ function boot(f: ReturnType<typeof fakeWindow>) {
 }
 
 test('a stored known theme id is applied', () => {
-  const f = fakeWindow({ stored: 'slate-dark' });
+  const f = fakeWindow({ stored: 'classic-dark' });
   boot(f);
-  assert.equal(f.theme(), 'slate-dark');
+  assert.equal(f.theme(), 'classic-dark');
+});
+
+test('the catalogue is Classic Light and Classic Dark only', () => {
+  assert.deepEqual(THEME_IDS, ['classic-light', 'classic-dark']);
+});
+
+test('a stored slate id (removed in 0.2.0) falls back to System before first paint, without throwing', () => {
+  for (const stored of ['slate-light', 'slate-dark']) {
+    for (const [prefersDark, expected] of [[false, 'classic-light'], [true, 'classic-dark']] as const) {
+      const f = fakeWindow({ stored, prefersDark });
+      assert.equal(f.theme(), undefined);
+      assert.doesNotThrow(() => boot(f), stored);
+      // Set synchronously by the inline head script itself, i.e. before any paint.
+      assert.equal(f.theme(), expected, `${stored} prefersDark=${prefersDark}`);
+      f.setPrefersDark(!prefersDark);
+      assert.equal(f.theme(), prefersDark ? 'classic-light' : 'classic-dark', `${stored} follows the OS like System`);
+    }
+  }
 });
 
 test('system follows prefers-color-scheme', () => {
@@ -94,9 +112,9 @@ test('no matchMedia means System resolves to light', () => {
 test('storage event from another tab updates the theme', () => {
   const f = fakeWindow({ stored: 'classic-light' });
   boot(f);
-  f.store.set(STORAGE_KEY, 'slate-light');
+  f.store.set(STORAGE_KEY, 'classic-dark');
   f.fire('storage', { key: STORAGE_KEY });
-  assert.equal(f.theme(), 'slate-light');
+  assert.equal(f.theme(), 'classic-dark');
 
   f.store.set(STORAGE_KEY, 'not-a-theme');
   f.fire('storage', { key: STORAGE_KEY });
@@ -104,11 +122,11 @@ test('storage event from another tab updates the theme', () => {
 });
 
 test('storage events for other keys are ignored; clear() resets to System', () => {
-  const f = fakeWindow({ stored: 'slate-dark' });
+  const f = fakeWindow({ stored: 'classic-dark' });
   boot(f);
-  f.store.set(STORAGE_KEY, 'classic-dark');
+  f.store.set(STORAGE_KEY, 'classic-light');
   f.fire('storage', { key: 'something-else' });
-  assert.equal(f.theme(), 'slate-dark');
+  assert.equal(f.theme(), 'classic-dark');
 
   f.store.clear();
   f.fire('storage', { key: null });
@@ -121,19 +139,19 @@ test('System mode follows OS changes; an explicit theme does not', () => {
   sys.setPrefersDark(true);
   assert.equal(sys.theme(), 'classic-dark');
 
-  const fixed = fakeWindow({ stored: 'slate-light' });
+  const fixed = fakeWindow({ stored: 'classic-light' });
   boot(fixed);
   fixed.setPrefersDark(true);
-  assert.equal(fixed.theme(), 'slate-light');
+  assert.equal(fixed.theme(), 'classic-light');
 });
 
 test('a same-page change event applies its choice, even when storage throws', () => {
   const f = fakeWindow({ storage: 'getitem-throws' });
   boot(f);
-  f.fire(CHANGE_EVENT, { detail: 'slate-dark' });
-  assert.equal(f.theme(), 'slate-dark');
+  f.fire(CHANGE_EVENT, { detail: 'classic-light' });
+  assert.equal(f.theme(), 'classic-light');
   f.setPrefersDark(true);
-  assert.equal(f.theme(), 'slate-dark', 'remembered choice survives an OS change');
+  assert.equal(f.theme(), 'classic-light', 'remembered choice survives an OS change');
   f.fire(CHANGE_EVENT, { detail: 'system' });
   assert.equal(f.theme(), 'classic-dark');
 });

@@ -36,12 +36,26 @@ test('lists System and every catalogue theme', () => {
     [...select.options].map((o) => [o.value, o.textContent]),
     [['system', 'System'], ...THEMES.map((t) => [t.id, t.label])],
   );
+  assert.deepEqual(
+    [...select.options].map((o) => o.textContent),
+    ['System', 'Classic Light', 'Classic Dark'],
+  );
   assert.equal(select.value, 'system');
 });
 
 test('shows the stored choice; unknown stored id shows System', () => {
-  assert.equal(mount(page('slate-light')).select.value, 'slate-light');
+  assert.equal(mount(page('classic-dark')).select.value, 'classic-dark');
   assert.equal(mount(page('gone-theme')).select.value, 'system');
+});
+
+test('a stored slate id (removed in 0.2.0) shows System and resolves through prefers-color-scheme', () => {
+  for (const stored of ['slate-light', 'slate-dark']) {
+    const w = page(stored);
+    const { select } = mount(w);
+    assert.equal(select.value, 'system', stored);
+    assert.equal(readThemeChoice(w), 'system', stored);
+    assert.equal(w.document.documentElement.getAttribute('data-theme'), 'classic-light', stored);
+  }
 });
 
 test('choosing a theme stores it and sets data-theme', () => {
@@ -58,18 +72,18 @@ test('choosing a theme stores it and sets data-theme', () => {
 test('a change in another tab updates the picker and the page', () => {
   const w = page('classic-light');
   const { select } = mount(w);
-  w.localStorage.setItem(STORAGE_KEY, 'slate-dark');
-  w.dispatchEvent(new w.StorageEvent('storage', { key: STORAGE_KEY, newValue: 'slate-dark' }));
-  assert.equal(select.value, 'slate-dark');
-  assert.equal(w.document.documentElement.getAttribute('data-theme'), 'slate-dark');
+  w.localStorage.setItem(STORAGE_KEY, 'classic-dark');
+  w.dispatchEvent(new w.StorageEvent('storage', { key: STORAGE_KEY, newValue: 'classic-dark' }));
+  assert.equal(select.value, 'classic-dark');
+  assert.equal(w.document.documentElement.getAttribute('data-theme'), 'classic-dark');
 });
 
 test('two pickers on one page stay in sync', () => {
   const w = page();
   const a = mount(w);
   const b = mount(w);
-  choose(w, a.select, 'slate-light');
-  assert.equal(b.select.value, 'slate-light');
+  choose(w, a.select, 'classic-dark');
+  assert.equal(b.select.value, 'classic-dark');
 });
 
 test('a removed picker stops listening', () => {
@@ -77,7 +91,7 @@ test('a removed picker stops listening', () => {
   const a = mount(w);
   const b = mount(w);
   b.el.remove();
-  choose(w, a.select, 'slate-dark');
+  choose(w, a.select, 'classic-dark');
   assert.equal(b.select.value, 'system');
 });
 
@@ -95,8 +109,10 @@ test('setThemeChoice normalises unknown ids to system; readThemeChoice reads the
   assert.equal(setThemeChoice('bogus', w), 'system');
   assert.equal(w.localStorage.getItem(STORAGE_KEY), 'system');
   assert.equal(readThemeChoice(w), 'system');
-  setThemeChoice('slate-light', w);
-  assert.equal(readThemeChoice(w), 'slate-light');
+  setThemeChoice('classic-dark', w);
+  assert.equal(readThemeChoice(w), 'classic-dark');
+  assert.equal(setThemeChoice('slate-light', w), 'system');
+  assert.equal(readThemeChoice(w), 'system');
   w.localStorage.setItem(STORAGE_KEY, 'removed-theme');
   assert.equal(readThemeChoice(w), 'system');
 });
