@@ -16,6 +16,8 @@
   // site-shell → Settings → Domains & Routes); traffic returns to GitHub Pages.
   // Then remove them here too: a deploy with no routes leaves attached routes
   // as they are, and a deploy with these entries attaches them again.
+  // While they are attached, never `wrangler rollback` to a version older than
+  // the one that added them: those answer / with 404. Detach them first.
   "routes": [
     { "pattern": "akshayprabhakant.com/_site/*", "zone_name": "akshayprabhakant.com" },
     { "pattern": "akshayprabhakant.com/", "zone_name": "akshayprabhakant.com" }

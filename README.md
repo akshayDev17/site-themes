@@ -250,12 +250,12 @@ The homepage is built and served by GitHub Pages; site-shell sits in front of it
 
 ### Releases
 
-A change to `src/` or `shell/` is one PR. CI builds and tests it, and the `site-shell` workflow uploads a preview version for the PR. Merging deploys it, and the homepage and every app that binds `SHELL` serve it at their next page view. Roll back with `wrangler rollback`. **Do not tag for site-shell-only changes:** a tag opens a bump PR in every app still on the package.
+A change to `src/` or `shell/` is one PR. CI builds and tests it, and the `site-shell` workflow uploads a preview version for the PR. Merging deploys it, and the homepage and every app that binds `SHELL` serve it at their next page view. Roll back with `wrangler rollback`, but while the two routes are attached, never to a version older than the one that added them: those versions answer `/` with `404`, so the homepage would go down. To roll back past it, first detach the routes as in [Rollback of the routes](#failure-behaviour). **Do not tag for site-shell-only changes:** a tag opens a bump PR in every app still on the package.
 
 ### Deploying site-shell
 
 `.github/workflows/site-shell.yml` has three triggers:
-- **PRs from this repository:** uploads a preview version (`wrangler versions upload --preview-alias pr-<n>`), which is not deployed. It answers at `https://pr-<n>-site-shell.<subdomain>.workers.dev`. Until the Worker exists, the run skips the upload with a notice; the first merge to `main` creates it.
+- **PRs from this repository:** uploads a preview version (`wrangler versions upload --preview-alias pr-<n>`), which is not deployed. It answers at `https://pr-<n>-site-shell.<subdomain>.workers.dev`, where `/` is a `404` (the homepage is served only on `HOME_ORIGIN`'s host), so homepage composition and fail open are checked in the local harness. Until the Worker exists, the run skips the upload with a notice; the first merge to `main` creates it.
 - **Pushes to `main`:** deploys (`wrangler deploy`): workers.dev and the two routes in `shell/wrangler.jsonc`. Attaching routes needs the deploy token to edit Workers routes on the `akshayprabhakant.com` zone; without that the deploy fails at the routes step, after uploading the Worker, and the routes stay unattached.
 - **A manual run on `main`:** also deploys.
 
