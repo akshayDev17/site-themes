@@ -79,18 +79,25 @@ test('retention counts released builds: local rebuilds before a commit never pus
   assert.deepEqual(parseBuilds('A\nD\n'), ['A', 'D']);
 });
 
-test('retention counts what main deployed: a pull request committing builds B, C and D keeps deployed build A', () => {
+/** A scratch git repo whose commits change only builds.txt. */
+function buildsRepo() {
   const repo = mkdtempSync(join(tmpdir(), 'site-shell-builds-'));
   const file = 'shell/generated/builds.txt';
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  const write = (ids: string[]) => writeFileSync(join(repo, file), ids.join('\n') + '\n');
   const commit = (ids: string[]) => {
-    writeFileSync(join(repo, file), ids.join('\n') + '\n');
+    write(ids);
     git('add', file);
     git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-qm', ids.join(','));
   };
+  git('init', '-q', '-b', 'main');
+  mkdirSync(join(repo, 'shell/generated'), { recursive: true });
+  return { repo, file, git, write, commit, done: () => rmSync(repo, { recursive: true, force: true }) };
+}
+
+test('retention counts what main deployed: a pull request committing builds B, C and D keeps deployed build A', () => {
+  const { repo, file, git, commit, done } = buildsRepo();
   try {
-    git('init', '-q', '-b', 'main');
-    mkdirSync(join(repo, 'shell/generated'), { recursive: true });
     commit(['A']);
     git('update-ref', 'refs/remotes/origin/main', 'HEAD');
     git('checkout', '-qb', 'pr');
@@ -108,10 +115,24 @@ test('retention counts what main deployed: a pull request committing builds B, C
     git('checkout', '-q', 'pr');
     assert.deepEqual(releasedBuilds(repo, file), ['A']);
 
-    // No origin/main (a shallow pull-request checkout): the working copy, which ends with the committed build.
+    // No origin/main (a shallow pull-request checkout): HEAD's builds.txt, which ends with the committed build.
     git('update-ref', '-d', 'refs/remotes/origin/main');
     assert.deepEqual(keptBuilds(releasedBuilds(repo, file), 'C', 3), ['A', 'B', 'C']);
   } finally {
-    rmSync(repo, { recursive: true, force: true });
+    done();
+  }
+});
+
+test('retention without origin/main counts what HEAD committed: local rebuilds B, C and D keep committed build A', () => {
+  const { repo, file, write, commit, done } = buildsRepo();
+  try {
+    commit(['A']);
+    for (const id of ['B', 'C', 'D']) {
+      const kept = keptBuilds(releasedBuilds(repo, file), id, 3);
+      assert.deepEqual(kept, ['A', id]);
+      write(kept);
+    }
+  } finally {
+    done();
   }
 });

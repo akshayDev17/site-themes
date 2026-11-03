@@ -23,8 +23,8 @@ const git = (repo: string, args: string[]) =>
 /**
  * `file` (repo-relative) at the merge-base of HEAD and origin/main, else at
  * origin/main; empty when main has no such file yet. Without an origin/main (a
- * shallow pull-request checkout) the working copy, which then already ends with
- * the committed build.
+ * shallow pull-request checkout) `file` as committed at HEAD, and the working
+ * copy only when it is not committed yet.
  */
 export function releasedBuilds(repo: string, file: string): string[] {
   let base: string;
@@ -34,8 +34,12 @@ export function releasedBuilds(repo: string, file: string): string[] {
     try {
       base = git(repo, ['rev-parse', '--verify', 'origin/main^{commit}']);
     } catch {
-      const working = join(repo, file);
-      return existsSync(working) ? parseBuilds(readFileSync(working, 'utf8')) : [];
+      try {
+        return parseBuilds(git(repo, ['show', `HEAD:${file}`]));
+      } catch {
+        const working = join(repo, file);
+        return existsSync(working) ? parseBuilds(readFileSync(working, 'utf8')) : [];
+      }
     }
   }
   try {
