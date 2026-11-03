@@ -13,7 +13,8 @@
 #   site-shell.<subdomain>.workers.dev, on the two routes, and to every app that
 #   binds SHELL. Attaching the routes needs the token to edit Workers routes on
 #   the akshayprabhakant.com zone. The run then checks, through the Cloudflare
-#   API, that site-shell owns exactly those two routes.
+#   API, that site-shell owns exactly those two routes (README "Deploying
+#   site-shell" lists the token permissions this needs).
 #
 # Uses the GitHub environment `production` (the place the app repos keep theirs):
 # secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, and the variable

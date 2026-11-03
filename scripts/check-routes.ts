@@ -51,12 +51,17 @@ export function readConfig(path: string): { name: string; zones: Map<string, str
   return { name: config.name, zones };
 }
 
-async function api<T>(base: string, token: string, path: string): Promise<T> {
+const ZONE_READ = 'the token needs Zone > Zone > Read on this zone';
+const ROUTES_READ = 'the token needs Zone > Workers Routes > Read or Edit on this zone';
+
+/** `permission` names what the token lacks when the API answers 403. */
+async function api<T>(base: string, token: string, path: string, permission: string): Promise<T> {
   const res = await fetch(`${base}/client/v4${path}`, { headers: { authorization: `Bearer ${token}` } });
   const body = (await res.json().catch(() => ({}))) as { success?: boolean; result?: T; errors?: { code?: number; message?: string }[] };
   if (!res.ok || body.success === false) {
     const errors = (body.errors ?? []).map((e) => `${e.code ?? ''} ${e.message ?? ''}`.trim()).join('; ');
-    throw new Error(`Cloudflare API ${path.split('?')[0]} answered HTTP ${res.status}${errors ? `: ${errors}` : ''}`);
+    const hint = res.status === 403 ? ` (${permission})` : '';
+    throw new Error(`Cloudflare API ${path.split('?')[0]} answered HTTP ${res.status}${errors ? `: ${errors}` : ''}${hint}`);
   }
   return body.result as T;
 }
@@ -71,9 +76,13 @@ async function main(): Promise<number> {
   const { name, zones } = readConfig(process.argv[2] ?? 'shell/wrangler.jsonc');
   let ok = true;
   for (const [zone, expected] of zones) {
-    const found = await api<{ id: string }[]>(base, token, `/zones?name=${encodeURIComponent(zone)}`);
-    if (found.length !== 1) throw new Error(`zone ${zone}: expected one zone, the API listed ${found.length}`);
-    const routes = await api<Route[]>(base, token, `/zones/${found[0].id}/workers/routes`);
+    const found = await api<{ id: string }[]>(base, token, `/zones?name=${encodeURIComponent(zone)}`, ZONE_READ);
+    if (found.length !== 1) {
+      // A token without Zone Read on the zone can get an empty list rather than a 403.
+      const hint = found.length === 0 ? ` (${ZONE_READ}, or the zone name is wrong)` : '';
+      throw new Error(`zone ${zone}: expected one zone, the API listed ${found.length}${hint}`);
+    }
+    const routes = await api<Route[]>(base, token, `/zones/${found[0].id}/workers/routes`, ROUTES_READ);
     const { missing, unexpected } = diffRoutes(expected, routes, name);
     for (const p of expected.filter((p) => !missing.includes(p))) console.log(`ok: ${p} -> ${name}`);
     for (const p of missing) console.log(`missing: ${p} is not attached to ${name}`);
