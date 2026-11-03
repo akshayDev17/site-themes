@@ -11,14 +11,14 @@
 // a release that changes any of it is a new URL. The newest KEEP released builds
 // stay in public/_site/, so a page composed just before a deploy still finds its
 // files (see shell-builds.ts).
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { build as esbuild, transform } from 'esbuild';
 import { buildBootScript } from '../src/boot.js';
 import { generateCss, themeDeclarations } from '../src/css.js';
 import { BASE_THEME_ID, THEMES } from '../src/themes.js';
-import { keptBuilds, parseBuilds } from './shell-builds.js';
+import { keptBuilds, releasedBuilds } from './shell-builds.js';
 
 const KEEP = 3;
 const root = new URL('../../', import.meta.url);
@@ -56,19 +56,9 @@ writeFileSync(
   ['/_site/*', '  Cache-Control: public, max-age=31536000, immutable', '  X-Content-Type-Options: nosniff', ''].join('\n'),
 );
 
-// Release order, newest last, as committed at HEAD; the working copy only when
-// builds.txt is not committed yet.
+// Release order, newest last, as main has it, plus this build.
 const orderFile = new URL('generated/builds.txt', shell);
-const released = (() => {
-  try {
-    return parseBuilds(execFileSync('git', ['show', 'HEAD:shell/generated/builds.txt'], {
-      cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
-    }));
-  } catch {
-    return existsSync(orderFile) ? parseBuilds(readFileSync(orderFile, 'utf8')) : [];
-  }
-})();
-const kept = keptBuilds(released, id, KEEP);
+const kept = keptBuilds(releasedBuilds(fileURLToPath(root), 'shell/generated/builds.txt'), id, KEEP);
 mkdirSync(new URL('generated/', shell), { recursive: true });
 for (const dir of readdirSync(site, { withFileTypes: true })) {
   if (dir.isDirectory() && !kept.includes(dir.name)) rmSync(new URL(`${dir.name}/`, site), { recursive: true, force: true });

@@ -1,10 +1,13 @@
 // The built site-shell data (shell/generated/build.json): the inline boot is the
 // catalogue's boot, minified, and runs before first paint in a bare context.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import vm from 'node:vm';
-import { keptBuilds, parseBuilds } from '../scripts/shell-builds.js';
+import { keptBuilds, parseBuilds, releasedBuilds } from '../scripts/shell-builds.js';
 import { STORAGE_KEY } from '../src/boot.js';
 import { themeDeclarations } from '../src/css.js';
 import { BASE_THEME_ID, THEMES, THEME_IDS } from '../src/themes.js';
@@ -74,4 +77,41 @@ test('retention counts released builds: local rebuilds before a commit never pus
   // An id released earlier moves to the end instead of appearing twice.
   assert.deepEqual(keptBuilds(['A', 'D', 'E'], 'A', 3), ['D', 'E', 'A']);
   assert.deepEqual(parseBuilds('A\nD\n'), ['A', 'D']);
+});
+
+test('retention counts what main deployed: a pull request committing builds B, C and D keeps deployed build A', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'site-shell-builds-'));
+  const file = 'shell/generated/builds.txt';
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  const commit = (ids: string[]) => {
+    writeFileSync(join(repo, file), ids.join('\n') + '\n');
+    git('add', file);
+    git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-qm', ids.join(','));
+  };
+  try {
+    git('init', '-q', '-b', 'main');
+    mkdirSync(join(repo, 'shell/generated'), { recursive: true });
+    commit(['A']);
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    git('checkout', '-qb', 'pr');
+    // What a HEAD-based history would have committed over three rounds.
+    commit(['A', 'B']);
+    commit(['A', 'B', 'C']);
+
+    assert.deepEqual(releasedBuilds(repo, file), ['A']);
+    assert.deepEqual(keptBuilds(releasedBuilds(repo, file), 'D', 3), ['A', 'D']);
+
+    // Main moved on and deployed E: the branch's merge-base still decides until it merges main.
+    git('checkout', '-q', 'main');
+    commit(['A', 'E']);
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    git('checkout', '-q', 'pr');
+    assert.deepEqual(releasedBuilds(repo, file), ['A']);
+
+    // No origin/main (a shallow pull-request checkout): the working copy, which ends with the committed build.
+    git('update-ref', '-d', 'refs/remotes/origin/main');
+    assert.deepEqual(keptBuilds(releasedBuilds(repo, file), 'C', 3), ['A', 'B', 'C']);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 });
