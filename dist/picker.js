@@ -96,8 +96,7 @@ function icon(doc, cls, viewBox, d) {
  * APG) listing System plus every catalogue theme. Attributes:
  * - `label`: visible label text (default "Theme");
  * - `hide-label`: keep the label for screen readers only.
- * Shadow parts `label`, `select` (the control), `listbox` and `option` can be
- * styled with ::part().
+ * Shadow parts `label` and `select` (the control) can be styled with ::part().
  */
 export function defineThemePicker(w = window) {
     if (w.customElements.get(PICKER_TAG))
@@ -161,7 +160,6 @@ export function defineThemePicker(w = window) {
             this.#list = doc.createElement('div');
             this.#list.id = 'listbox';
             this.#list.className = 'list';
-            this.#list.setAttribute('part', 'listbox');
             this.#list.setAttribute('role', 'listbox');
             this.#list.setAttribute('aria-labelledby', 'label');
             this.#list.setAttribute('tabindex', '-1');
@@ -170,7 +168,6 @@ export function defineThemePicker(w = window) {
                 option.id = `option-${value}`;
                 option.className = 'option';
                 option.dataset.value = value;
-                option.setAttribute('part', 'option');
                 option.setAttribute('role', 'option');
                 option.setAttribute('aria-selected', 'false');
                 const label = doc.createElement('span');

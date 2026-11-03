@@ -151,7 +151,7 @@ The page serves its own copy. No other app links to it.
 - Keyboard: Down, Up, Enter or Space opens the list on the chosen option, and Home or End opens it on the first or last option. With the list open, the arrows, Home/End and PageUp/PageDown move the highlight. Enter or Space chooses and closes, Escape closes without choosing, and Tab chooses and moves on. Typing a label's first letters jumps to it. Focus stays on the control throughout, and `aria-activedescendant` names the highlighted option. A press outside closes the list.
 - A click on the label focuses the control, as it would a native `<select>`.
 - Attributes: `label="…"` sets the label text (default "Theme"). `hide-label` keeps the label for screen readers only.
-- Styling: use `site-theme-picker::part(select)` (the control), `::part(label)`, `::part(listbox)` and `::part(option)`.
+- Styling: use `site-theme-picker::part(select)` (the control) and `::part(label)`. The open list takes its look from the control.
 - Importing the module does not touch the DOM, so server-side rendering is safe. Call `defineThemePicker()` on the client. The React wrapper does this in an effect.
 
 ## Contrast gate

@@ -13,8 +13,7 @@ export declare function setThemeChoice(choice: string, w?: Win): string;
  * APG) listing System plus every catalogue theme. Attributes:
  * - `label`: visible label text (default "Theme");
  * - `hide-label`: keep the label for screen readers only.
- * Shadow parts `label`, `select` (the control), `listbox` and `option` can be
- * styled with ::part().
+ * Shadow parts `label` and `select` (the control) can be styled with ::part().
  */
 export declare function defineThemePicker(w?: Win): void;
 export {};
