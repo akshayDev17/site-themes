@@ -136,7 +136,7 @@ test('chat with a <site-slot name="site-path">: the slot\'s content becomes the 
   const body = await res.text();
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('x-site-shell'), `${build().id}; app=chat`);
-  assert.equal(res.headers.get('x-robots-tag'), null, 'a listed app is indexed');
+  assert.ok(!body.includes('name="robots"'), 'a listed app is indexed');
 
   const open = `<site-slot name="site-path" data-tail='[{"label":"Front page"}]'>`;
   const inner = (html) => html.slice(html.indexOf(open) + open.length, html.indexOf('</site-slot>'));

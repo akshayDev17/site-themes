@@ -61,7 +61,6 @@ test('a page with no slot gets the head block and nothing else', async () => {
   assert.equal(r.status, 200);
   assert.equal(r.body, composed(body));
   assert.equal(r.headers.get('etag'), null);
-  assert.equal(r.headers.get('x-robots-tag'), null);
 });
 
 test('the saved app fixtures have no slot: composing them inserts the head block only, byte for byte', async () => {
@@ -113,7 +112,6 @@ test('listed:false: the app\'s pages are noindex and say "Not listed"; other app
   const own = await compose(page(path), 'graph', ['graph']);
   const apps = APPS.map((a) => (a.id === 'graph' ? { ...a, listed: false } : a));
   assert.equal(own.body, composed(slot('name="site-path"', sitePathMarkup('graph', [], apps)!), HEAD + NOINDEX));
-  assert.equal(own.headers.get('x-robots-tag'), 'noindex');
   assert.ok(own.body.includes('Not listed'));
 
   // noindex does not depend on a slot.
@@ -121,7 +119,6 @@ test('listed:false: the app\'s pages are noindex and say "Not listed"; other app
   assert.equal(bare.body, composed('<main></main>', HEAD + NOINDEX));
 
   const other = await compose(page(path + slot('name="site-apps"', '')), 'atlas', ['graph']);
-  assert.equal(other.headers.get('x-robots-tag'), null);
   assert.ok(!other.body.includes(NOINDEX));
   assert.ok(!other.body.includes('Graph Notes'));
   assert.ok(!other.body.includes('href="/graph/"'));

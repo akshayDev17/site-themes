@@ -191,7 +191,7 @@ An app's Worker hands each HTML response to site-shell over a Service Binding: `
 1. the boot script, inline (the same one the package exports), so `<html data-theme>` is set before first paint;
 2. the theme tokens, inline (`:root,[data-theme="classic-light"]{…}[data-theme="classic-dark"]{…}`), so even a first visit has no flash and no extra request;
 3. `<script defer src="<assetBase><build>/site.js">`, which defines `<site-theme-picker>` (the app keeps placing the element itself) and opens the site path's sheet in browsers without invoker commands.
-4. on an [unlisted](#the-app-list) app's pages only: `<meta name="robots" content="noindex">`, plus an `X-Robots-Tag: noindex` header.
+4. on an [unlisted](#the-app-list) app's pages only: `<meta name="robots" content="noindex">`.
 
 It also fills two elements an app may place in its body, from the [app list](#the-app-list):
 

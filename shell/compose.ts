@@ -3,8 +3,7 @@
 // - <head>: the inline boot script and the inline theme tokens go first (after
 //   a leading <meta charset>, which must stay inside the first 1024 bytes),
 //   followed by the deferred /_site/<build>/site.js that defines
-//   <site-theme-picker>. An unlisted app's pages also get a noindex robots meta
-//   (and an X-Robots-Tag header).
+//   <site-theme-picker>. An unlisted app's pages also get a noindex robots meta.
 // - <site-slot name="site-path"> and <site-slot name="site-apps">: filled from
 //   the app list (src/apps.ts; markup in nav.ts). The <site-slot> element stays
 //   and only its content is replaced, so whatever the app put inside it is the
@@ -64,7 +63,6 @@ export function composeResponse(res: Response, opts: ComposeOptions, build: Buil
   headers.delete('last-modified');
   headers.delete('content-length');
   headers.set('x-site-shell', `${build.id}; app=${opts.app}`);
-  if (unlisted) headers.set('x-robots-tag', 'noindex');
 
   let inserted = false;
   const insertNear = (el: Element) => {
