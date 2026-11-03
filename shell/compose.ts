@@ -18,8 +18,9 @@ export interface ComposeOptions {
   /** Which app is calling; recorded in a response header for debugging. */
   app: string;
   /**
-   * Where /_site/ assets are reachable from this app's pages. '/_site/' once the
-   * zone route is attached; '<app prefix>/_site/' while the app forwards them.
+   * Where /_site/ assets are reachable from this app's pages: '<app prefix>/_site/'
+   * while the app forwards them. site-shell's ASSET_BASE ('/_site/', the zone
+   * route) takes precedence when set.
    */
   assetBase?: string;
 }

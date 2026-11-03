@@ -3,7 +3,7 @@
 Shared themes for the akshayprabhakant.com apps (homepage, chat archive, quiz, graph notes, election atlas), delivered two ways from one catalogue (`src/themes.ts`):
 
 - **The build-time package** (`dist/`, everything up to [site-shell](#site-shell)). Each app installs a pinned git tag and bundles the themes into its own build, so nothing is fetched when a page loads. Every app uses it today.
-- **site-shell** (`shell/`), a Cloudflare Worker that adds the theme to each app's HTML as it streams out, so one release reaches every app at its next page view. It is not routed and no app binds it yet; see [site-shell](#site-shell).
+- **site-shell** (`shell/`), a Cloudflare Worker that adds the theme to each app's HTML as it streams out, so one release reaches every app at its next page view. It serves the shared files at `akshayprabhakant.com/_site/*` and composes the homepage (`/`); no app binds it yet. See [site-shell](#site-shell).
 
 Installing the package from git still copies only `dist/` (`"files"` in `package.json`), so site-shell changes never reach an app through the package and need no tag.
 
@@ -182,7 +182,7 @@ The CSS, the boot script's id list and the picker's options all derive from the 
 
 site-shell is the shared Worker that composes the theme into every app's HTML (theme only for now; navigation comes later). It is built from the same catalogue, boot script and picker as the package.
 
-**Status:** it has no route and no app binds it yet, so it serves no production traffic. `akshayprabhakant.com/_site/*` and the exact `/` route are proposals awaiting approval.
+**Status:** it has exactly two routes, both approved by the owner: `akshayprabhakant.com/_site/*` (the shared files) and the exact `akshayprabhakant.com/` (the homepage, see [The homepage](#the-homepage)). No app binds it yet. The catch-all `akshayprabhakant.com/*` is not routed and must not be.
 
 ### What compose() adds
 
@@ -198,7 +198,18 @@ Nothing else in the page changes. Responses that are not `200 text/html` pass th
 
 `npm run build` writes `shell/public/_site/<build>/site.js`, where `<build>` is a content hash of everything a composed page gets from that build. There is no stylesheet: the tokens are inline in the composed page, so its first paint needs no request. `shell/public/_headers` serves them with `Cache-Control: public, max-age=31536000, immutable`. The newest 3 released builds are kept, so a page composed just before a deploy still finds its files. Released means listed in `shell/generated/builds.txt` on `main` (at the branch's merge-base with `origin/main`), since only `main` deploys: a build appends its id to that list, so builds made on a branch, committed or not, never take a slot from a deployed build or push it out. A missing build answers `404` with `no-store`, so it is never cached as missing.
 
-Until `akshayprabhakant.com/_site/*` is routed to site-shell, each app forwards `<its prefix>/_site/…` to `env.SHELL.fetch()` through its own route, and passes that prefix as `assetBase`.
+`akshayprabhakant.com/_site/*` routes to site-shell, and its `ASSET_BASE` variable (`/_site/`) makes every composed page load these files from that one URL, whatever `assetBase` the app passes. Any other path under `/_site/` answers `404` with `no-store`. An app may still forward `<its prefix>/_site/…` to `env.SHELL.fetch()` through its own route; that keeps working, and it is what pages use if `ASSET_BASE` is ever unset.
+
+### The homepage
+
+The homepage is built and served by GitHub Pages; site-shell sits in front of it on the exact `/` route only. For a `GET /` it fetches the same URL from `HOME_ORIGIN` (`https://akshayprabhakant.com`; a Worker's fetch to its own zone goes to the DNS origin, GitHub Pages, never back to a Worker) and composes the answer exactly as for an app: the head block after `<meta charset="utf-8">`, nothing else changed, Pages' headers kept except `ETag` and `Last-Modified`.
+
+- It asks Pages with redirects left manual and without `If-None-Match` or `If-Modified-Since`, so a Pages redirect reaches the browser as one and a GET always gets a page to compose.
+- Anything that is not a `200 text/html` answer to a `GET` (a `HEAD`, a redirect, a Pages error) passes through unchanged.
+- **Fail open:** any error before the page starts streaming serves Pages' response unchanged, and an uncaught error passes the request through to the origin (`passThroughOnException`).
+- A route pattern matches the whole URL, query included, so `/?anything` is not routed: GitHub Pages serves it directly, as before.
+- The homepage still bundles site-themes v0.2.0. The composed boot runs first and sets `__siteThemeBoot`, so the bundled boot does nothing; the bundled picker module sees `<site-theme-picker>` already defined and does nothing. Removing the homepage's copy of the package is a later homepage change.
+- The homepage is served only for `HOME_ORIGIN`'s host. On workers.dev or a preview URL, `/` answers `404` with `no-store` like any other path that is not a file, so there is no second copy of the homepage; check homepage changes, fail open included, with the local harness.
 
 ### Wiring an app
 
@@ -232,16 +243,20 @@ Until `akshayprabhakant.com/_site/*` is routed to site-shell, each app forwards 
 | No `SHELL` binding, site-shell not deployed or unreachable, or `compose()` throws | the page exactly as built (after step 4, in Classic Light, with no picker) |
 | An edit throws while the page streams | that edit is skipped; every handler is guarded |
 | A platform fault after the response has started (for example a CPU limit) | an error or a cut-short page: no hook can recover once streaming has begun |
+| The homepage: fetching or composing fails before the page streams | GitHub Pages' response, unchanged |
+| The homepage: an uncaught error in site-shell | the request passes through to GitHub Pages |
+
+**Rollback of the routes:** detach `akshayprabhakant.com/_site/*` and `akshayprabhakant.com/` from site-shell in the Cloudflare dashboard (Workers & Pages → site-shell → Settings → Domains & Routes). The homepage is then GitHub Pages again and `/_site/` is a Pages 404. Also remove them from `shell/wrangler.jsonc`: `wrangler deploy` attaches the routes the config lists, and a config with no routes leaves attached routes in place, so removing them from the config alone does not detach them.
 
 ### Releases
 
-A change to `src/` or `shell/` is one PR. CI builds and tests it, and the `site-shell` workflow uploads a preview version for the PR. Merging deploys it, and every app that binds `SHELL` serves it at its next page view. Roll back with `wrangler rollback`. **Do not tag for site-shell-only changes:** a tag opens a bump PR in every app still on the package.
+A change to `src/` or `shell/` is one PR. CI builds and tests it, and the `site-shell` workflow uploads a preview version for the PR. Merging deploys it, and the homepage and every app that binds `SHELL` serve it at their next page view. Roll back with `wrangler rollback`, but while the two routes are attached, never to a version older than the one that added them: those versions answer `/` with `404`, so the homepage would go down. To roll back past it, first detach the routes as in [Rollback of the routes](#failure-behaviour). **Do not tag for site-shell-only changes:** a tag opens a bump PR in every app still on the package.
 
 ### Deploying site-shell
 
 `.github/workflows/site-shell.yml` has three triggers:
-- **PRs from this repository:** uploads a preview version (`wrangler versions upload --preview-alias pr-<n>`), which is not deployed. It answers at `https://pr-<n>-site-shell.<subdomain>.workers.dev`. Until the Worker exists, the run skips the upload with a notice; the first merge to `main` creates it.
-- **Pushes to `main`:** deploys (`wrangler deploy`), to workers.dev only.
+- **PRs from this repository:** uploads a preview version (`wrangler versions upload --preview-alias pr-<n>`), which is not deployed. It answers at `https://pr-<n>-site-shell.<subdomain>.workers.dev`, where `/` is a `404` (the homepage is served only on `HOME_ORIGIN`'s host), so homepage composition and fail open are checked in the local harness. Until the Worker exists, the run skips the upload with a notice; the first merge to `main` creates it.
+- **Pushes to `main`:** deploys (`wrangler deploy`): workers.dev and the two routes in `shell/wrangler.jsonc`. Attaching routes needs the deploy token to edit Workers routes on the `akshayprabhakant.com` zone; without that the deploy fails at the routes step, after uploading the Worker, and the routes stay unattached.
 - **A manual run on `main`:** also deploys.
 
 It reads these from the GitHub environment `production`, which the owner manages:
@@ -263,11 +278,11 @@ npm run test:shell                              # wrangler dev sessions: each ap
 npm run dev:shell                               # site-shell alone on localhost
 ```
 
-The harness runs on local workerd with no Cloudflare account. Each scenario is one `wrangler dev -c <app> -c <shell>` session with a private dev registry, because otherwise a site-shell left running by any other session would answer the binding. The homepage, chat and atlas fixtures are the public pages' HTML and CSS saved on 2026-11-03. Quiz and graph notes sit behind Access, so their fixtures are the index pages of a local static build of each app's `frontend/` from its `main` branch (see `make-fixtures.mjs`). The homepage has no Worker (GitHub Pages serves it), so its harness Worker stands in for one on the proposed `/` route. The boot string is built in Node by `scripts/build-shell.ts`, never by `Function#toString()` inside the Worker bundle: wrangler's default `keep_names` would put `__name(...)` calls inside it, and those calls do not exist in a browser.
+The harness runs on local workerd with no Cloudflare account. Each scenario is one `wrangler dev -c <app> -c <shell>` session with a private dev registry, because otherwise a site-shell left running by any other session would answer the binding. The homepage, chat and atlas fixtures are the public pages' HTML and CSS saved on 2026-11-03. Quiz and graph notes sit behind Access, so their fixtures are the index pages of a local static build of each app's `frontend/` from its `main` branch (see `make-fixtures.mjs`). The homepage tests run site-shell itself with `HOME_ORIGIN` pointed at a local stand-in for GitHub Pages that serves the saved homepage, and requests addressed to that host (`--local-upstream`); fail open is shown with `shell-bad-asset-base.jsonc`, whose `ASSET_BASE` compose() rejects. The boot string is built in Node by `scripts/build-shell.ts`, never by `Function#toString()` inside the Worker bundle: wrangler's default `keep_names` would put `__name(...)` calls inside it, and those calls do not exist in a browser.
 
 ## Changelog
 
-- **Unreleased**: added site-shell (`shell/`, `scripts/build-shell.ts`), the theme-only composition Worker. The package (`dist/`) is unchanged, so no tag is needed.
+- **Unreleased**: site-shell is routed at `akshayprabhakant.com/_site/*` (composed pages load `/_site/<build>/` through `ASSET_BASE`) and the exact `akshayprabhakant.com/`, where it composes the GitHub Pages homepage and fails open to Pages. Earlier: added site-shell (`shell/`, `scripts/build-shell.ts`), the theme-only composition Worker. The package (`dist/`) is unchanged, so no tag is needed.
 - **0.2.0**: removed the Slate Light (`slate-light`) and Slate Dark (`slate-dark`) themes. The catalogue is now Classic Light and Classic Dark, with System as the default. A stored slate id falls back to System (Classic Light or Classic Dark through `prefers-color-scheme`). Every export and token name is unchanged, so an app bumps with no code change.
 - **0.1.0**: first release, with Classic Light, Classic Dark, Slate Light and Slate Dark.
 

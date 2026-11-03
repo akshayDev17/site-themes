@@ -1,0 +1,10 @@
+{
+  // Harness only: site-shell with no ASSET_BASE, as before akshayprabhakant.com/_site/*
+  // was routed. Composed pages then load the shared files through each app's own
+  // forwarded prefix. Never deployed.
+  "name": "site-shell",
+  "main": "../worker.ts",
+  "compatibility_date": "2026-10-10",
+  "assets": { "directory": "../public", "binding": "ASSETS" },
+  "vars": { "HOME_ORIGIN": "https://akshayprabhakant.com" }
+}
