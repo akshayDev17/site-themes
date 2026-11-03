@@ -1,3 +1,6 @@
 node_modules/
 build/
 .claude/
+.wrangler/
+shell/test-harness/apps/*/out/
+shell/test-harness/apps/*/dist/

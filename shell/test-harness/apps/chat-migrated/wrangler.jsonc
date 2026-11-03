@@ -1,0 +1,9 @@
+{
+  "name": "ai-chat-archive-frontend",
+  "main": "../chat/worker.js",
+  "compatibility_date": "2026-10-10",
+  "workers_dev": false,
+  // after the app drops the package: no bundled boot script or tokens
+  "assets": { "directory": "./out", "binding": "ASSETS", "run_worker_first": true },
+  "services": [{ "binding": "SHELL", "service": "site-shell" }]
+}

@@ -1,0 +1,8 @@
+{
+  // site-shell as it would run once the /_site/* route is approved
+  "name": "site-shell",
+  "main": "../worker.ts",
+  "compatibility_date": "2026-10-10",
+  "assets": { "directory": "../public", "binding": "ASSETS" },
+  "vars": { "ASSET_BASE": "/_site/" }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "ai-chat-archive-frontend",
+  "main": "../chat/worker.js",
+  "compatibility_date": "2026-10-10",
+  "workers_dev": false,
+  // no SHELL binding: the hook must serve the page as built
+  "assets": { "directory": "../chat-migrated/out", "binding": "ASSETS", "run_worker_first": true }
+}
