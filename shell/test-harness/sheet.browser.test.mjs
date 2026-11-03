@@ -5,6 +5,8 @@
 // (here to about 580x1256), and the fixed sheet is placed in the layout
 // viewport; the sheet must still sit inside the visual viewport, Close included,
 // before and after the page is panned, and when it is pinch-zoomed in.
+// Panning and zooming are driven through the page and DevTools emulation rather
+// than synthesized touch gestures, which Linux headless Chrome ignores.
 //
 //   npm run build && npm run test:sheet      (CHROME_PATH picks the browser)
 import assert from 'node:assert/strict';
@@ -73,12 +75,11 @@ async function openPhone(url) {
   await tab.call('Page.navigate', { url });
   for (let i = 0; i < 50 && (await tab.evaluate('document.readyState')) !== 'complete'; i++) await new Promise((r) => setTimeout(r, 100));
   const settle = () => tab.evaluate('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))');
-  // One axis per gesture: a diagonal touch drag locks to its main axis.
-  const swipe = (x, y) =>
-    tab.call('Input.synthesizeScrollGesture', { x: 200, y: 300, xDistance: -x, yDistance: -y, gestureSourceType: 'touch', speed: 2000 });
-  const pan = async (x, y) => {
-    if (x) await swipe(x, 0);
-    if (y) await swipe(0, y);
+  // Pans to a corner of the wide content. scrollIntoView moves the visual viewport
+  // as a touch pan does (window.scrollTo moves only the layout viewport), and,
+  // unlike synthesized touch gestures, it works in Linux headless Chrome too.
+  const pan = async (corner) => {
+    await tab.evaluate(`document.querySelector('.wide').scrollIntoView({ block: '${corner}', inline: '${corner}' })`);
     await settle();
   };
   const tapPill = async () => {
@@ -103,14 +104,14 @@ for (const theme of ['classic-light', 'classic-dark']) {
     assert.equal((await p.measure()).open, false, 'Close closes the sheet');
 
     // Pan right and down to the far corner, then open.
-    await p.pan(400, 1500);
+    await p.pan('end');
     const panned = await p.measure();
     assert.ok(panned.vv.x > 100 && panned.vv.y > 100, `the screen was panned within the layout viewport: ${JSON.stringify(panned.vv)}`);
     await p.tapPill();
     assertOnScreen(await p.measure(), 'opened after panning right and down');
 
     // Pan back while it is open.
-    await p.pan(-400, -1500);
+    await p.pan('start');
     assertOnScreen(await p.measure(), 'panned back while open');
     await p.tab.evaluate("document.querySelector('.sp-close').click()");
     await p.settle();
@@ -134,7 +135,8 @@ for (const scale of [1.5, 2]) {
   test(`pinch-zoomed ${scale}x on an overflowing page, the sheet and Close are on the screen`, async (t) => {
     const p = await openPhone(page('classic-light', true));
     t.after(() => p.tab.close());
-    await p.tab.call('Input.synthesizePinchGesture', { x: 195, y: 400, scaleFactor: scale, gestureSourceType: 'touch' });
+    // The pinch-zoom DevTools emulates; synthesized pinch gestures do nothing in Linux headless Chrome.
+    await p.tab.call('Emulation.setPageScaleFactor', { pageScaleFactor: scale });
     await p.settle();
     const zoomed = await p.measure();
     assert.ok(Math.abs(zoomed.vv.w - PHONE.width / scale) < 2, `the page is zoomed ${scale}x: ${JSON.stringify(zoomed.vv)}`);

@@ -71,7 +71,8 @@ export async function launchChrome() {
       ws.close();
       child.kill();
       await exited;
-      rmSync(profile, { recursive: true, force: true });
+      // Chrome's helper processes can still be writing the profile as the browser exits.
+      rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     },
   };
 }
