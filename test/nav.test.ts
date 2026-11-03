@@ -19,7 +19,7 @@ function render(html: string | null) {
     pill: doc.querySelector('.sp-pill')!,
     sheet: doc.querySelector('dialog')!,
     sheetRows: [...doc.querySelectorAll('dialog li a')],
-    css: doc.querySelector('style')!.textContent!,
+    css: [...doc.querySelector('style')!.sheet!.cssRules],
   };
 }
 
@@ -164,17 +164,50 @@ test('listed:false: the app says "Not listed" on its own switcher and is absent 
 
 test('the slot styles: Newsreader at 15 px in sentence case, 44 px targets, the folds at 900 and 640 px', () => {
   const { css } = render(sitePathMarkup('atlas'));
-  assert.match(css, /\.sp\{[^}]*font:400 15px\/1\.3 var\(--font-serif/);
-  assert.match(css, /text-transform:none/);
-  assert.doesNotMatch(css, /font-mono|uppercase/);
-  assert.match(css, /\.sp a,\.sp-here\{[^}]*min-height:44px;min-width:44px/);
-  // The pill: drawn 34 px tall (1 px borders included), tapped over 34 + 2 × 6 = 46 px.
-  assert.match(css, /\.sp-pill\{[^}]*position:relative;[^}]*box-sizing:border-box;min-height:34px/);
-  assert.match(css, /\.sp-pill::before\{content:"";position:absolute;inset:-6px -1px\}/);
-  assert.match(css, /\.sp-close\{[^}]*min-height:44px/);
-  assert.match(css, /@media \(max-width:900px\)\{\.sp-long\{display:none!important\}\.sp-short\{display:inline-flex!important;justify-content:flex-start\}\}/);
-  assert.match(css, /@media \(max-width:640px\)\{\.sp-apps\{display:none!important\}\.sp-pill\{display:inline-flex\}\.sp-crumb:not\(:last-child\)\{display:none\}\}/);
-  assert.doesNotMatch(css, /var\(--accent\)/, 'the current app is marked in ink, never accent');
+  const styleRules = (rules: CSSRule[]) => rules.filter((r): r is CSSStyleRule => 'selectorText' in r);
+  const rule = (rules: CSSRule[], selector: string) => {
+    const found = styleRules(rules).find((r) => r.selectorText === selector);
+    assert.ok(found, selector);
+    return found.style;
+  };
+  const media = (query: string) => {
+    const found = css.find((r): r is CSSMediaRule => 'media' in r && (r as CSSMediaRule).media.mediaText === query);
+    assert.ok(found, query);
+    return [...found.cssRules];
+  };
+  const declarations = [css, ...css.filter((r): r is CSSMediaRule => 'media' in r).map((r) => [...r.cssRules])]
+    .flatMap(styleRules)
+    .flatMap((r) => Array.from({ length: r.style.length }, (_, i) => r.style.getPropertyValue(r.style[i])));
+
+  const sp = rule(css, '.sp');
+  assert.equal(sp.getPropertyValue('font'), '400 15px/1.3 var(--font-serif,Georgia,serif)');
+  assert.equal(sp.getPropertyValue('text-transform'), 'none');
+  assert.ok(!declarations.some((v) => /font-mono|uppercase/.test(v)), 'no mono or uppercase anywhere');
+
+  const target = rule(css, '.sp a,.sp-here');
+  assert.equal(target.getPropertyValue('min-height'), '44px');
+  assert.equal(target.getPropertyValue('min-width'), '44px');
+  // The pill: drawn 34 px tall (1 px borders included); its ::before sits on the 32 px padding box, so it is tapped over 32 + 2 × 6 = 44 px.
+  const pill = rule(css, '.sp-pill');
+  assert.equal(pill.getPropertyValue('position'), 'relative');
+  assert.equal(pill.getPropertyValue('box-sizing'), 'border-box');
+  assert.equal(pill.getPropertyValue('min-height'), '34px');
+  const tap = rule(css, '.sp-pill::before');
+  assert.equal(tap.getPropertyValue('content'), '""');
+  assert.equal(tap.getPropertyValue('position'), 'absolute');
+  assert.equal(tap.getPropertyValue('inset'), '-6px -1px');
+  assert.equal(rule(css, '.sp-close').getPropertyValue('min-height'), '44px');
+
+  const at900 = media('(max-width:900px)');
+  assert.deepEqual([rule(at900, '.sp-long').getPropertyValue('display'), rule(at900, '.sp-long').getPropertyPriority('display')], ['none', 'important']);
+  assert.deepEqual([rule(at900, '.sp-short').getPropertyValue('display'), rule(at900, '.sp-short').getPropertyPriority('display')], ['inline-flex', 'important']);
+  const at640 = media('(max-width:640px)');
+  assert.deepEqual([rule(at640, '.sp-apps').getPropertyValue('display'), rule(at640, '.sp-apps').getPropertyPriority('display')], ['none', 'important']);
+  assert.equal(rule(at640, '.sp-pill').getPropertyValue('display'), 'inline-flex');
+  assert.equal(rule(at640, '.sp-crumb:not(:last-child)').getPropertyValue('display'), 'none');
+
+  assert.equal(rule(css, '.sp .sp-app[aria-current]').getPropertyValue('color'), 'var(--text)');
+  assert.ok(!declarations.some((v) => v.includes('var(--accent)')), 'the current app is marked in ink, never accent');
 });
 
 test('the homepage list: the listed apps other than Portfolio, gated ones marked', () => {

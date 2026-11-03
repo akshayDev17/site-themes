@@ -34,6 +34,19 @@ export interface ComposeOptions {
 
 const ASSET_BASE = /^\/(?:[a-z0-9_-]+\/)*_site\/$/;
 const NOINDEX = '<meta name="robots" content="noindex" data-site-shell>';
+const CHAR_REF = /&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|(quot|amp|apos|lt|gt));/g;
+const NAMED_REFS: Record<string, string> = { quot: '"', amp: '&', apos: "'", lt: '<', gt: '>' };
+
+/** HTMLRewriter returns attribute values as written; this resolves their character references. */
+function decodeAttr(raw: string | null): string | null {
+  return (
+    raw?.replace(CHAR_REF, (ref, dec?: string, hex?: string, name?: string) => {
+      if (name) return NAMED_REFS[name];
+      const cp = dec ? Number(dec) : parseInt(hex!, 16);
+      return cp <= 0x10ffff ? String.fromCodePoint(cp) : ref;
+    }) ?? null
+  );
+}
 
 export function isHtml(res: Response): boolean {
   return res.status === 200 && (res.headers.get('content-type') ?? '').toLowerCase().startsWith('text/html');
@@ -76,9 +89,10 @@ export function composeResponse(res: Response, opts: ComposeOptions, build: Buil
   // Each slot name is filled once per page (the site path's sheet has a fixed id).
   const filled = new Set<string>();
   const fillSlot = (el: Element) => {
-    const name = el.getAttribute('name') ?? '';
+    const attr = (attrName: string) => decodeAttr(el.getAttribute(attrName));
+    const name = attr('name') ?? '';
     if (filled.has(name)) return;
-    const html = slotMarkup(name, (attr) => el.getAttribute(attr), opts.app, apps);
+    const html = slotMarkup(name, attr, opts.app, apps);
     if (html === null) return;
     filled.add(name);
     el.setInnerContent(html, { html: true });

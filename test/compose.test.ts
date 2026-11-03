@@ -88,6 +88,18 @@ test('<site-slot name="site-path">: its content becomes the site path, the eleme
   assert.ok(!r.body.includes('← Akshay Prabhakant'), 'the fallback is replaced');
 });
 
+test('a React-style data-tail (double-quoted, entity-escaped) is decoded before it is read', async () => {
+  const tail: Crumb[] = [{ label: 'Jammu & Kashmir', href: '/elections/india/jk/' }, { label: `"Q" & A's <b>` }];
+  const reactAttr = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' })[c]!);
+  const attrs = `name="site-path" data-tail="${reactAttr(JSON.stringify(tail))}"`;
+  const r = await compose(page(slot(attrs, 'fallback')), 'atlas');
+  assert.equal(r.body, composed(slot(attrs, sitePathMarkup('atlas', tail)!)));
+
+  const decimal = `name="site-path" data-tail='[{"label":"Q&#38;A &#60;1&#62;"}]'`;
+  const d = await compose(page(slot(decimal, 'fallback')), 'atlas');
+  assert.equal(d.body, composed(slot(decimal, sitePathMarkup('atlas', [{ label: 'Q&A <1>' }])!)));
+});
+
 test('<site-slot name="site-apps">: the homepage list; slots work anywhere in the body', async () => {
   const body = `<main><section id="apps"><div>${slot('name="site-apps"', '<p>apps</p>')}</div></section></main>`;
   const r = await compose(page(body), 'home');
