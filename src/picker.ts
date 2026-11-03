@@ -196,6 +196,7 @@ export function defineThemePicker(w: Win = window): void {
       if (this.#popover) this.#list.setAttribute('popover', 'manual');
       else this.#list.hidden = true;
 
+      this.#label.addEventListener('click', () => this.#trigger.focus());
       this.#trigger.addEventListener('click', () => (this.#isOpen() ? this.#close() : this.#open(this.#selectedIndex())));
       this.#trigger.addEventListener('keydown', (e) => this.#onKey(e));
       this.#trigger.addEventListener('blur', () => this.#close());

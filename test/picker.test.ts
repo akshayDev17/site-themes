@@ -218,6 +218,14 @@ test('pointer: the control toggles the list, an option chooses, a press outside 
   assert.equal(w.localStorage.getItem(STORAGE_KEY), 'classic-dark');
 });
 
+test('a click on the label focuses the control', () => {
+  const w = page();
+  const p = mount(w);
+  (p.text as HTMLElement).click();
+  assert.equal(p.el.shadowRoot!.activeElement, p.box);
+  assert.equal(state(p).expanded, 'false');
+});
+
 test('a choice made elsewhere updates the control', () => {
   const w = page();
   const a = mount(w);
