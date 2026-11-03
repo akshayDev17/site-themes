@@ -1,5 +1,5 @@
 // <site-theme-picker> in headless Chrome over CDP, in Classic Light and Classic
-// Dark: the chevron's inner padding at several type sizes, the open list drawn
+// Dark: the chevron's inner padding and the control's width at several type sizes, the open list drawn
 // in the control's own type, colours, radius and border, the hover and keyboard
 // highlight (contrast-checked from the computed colours), the APG keyboard
 // model with real key events, and closing on a press outside. Each theme's open
@@ -121,6 +121,11 @@ for (const theme of ['classic-light', 'classic-dark']) {
       assert.ok(centre <= 1, `chevron is ${centre}px off the vertical centre`);
       assert.ok(m.chevron.left - m.value.right >= 6, `value ends ${m.chevron.left - m.value.right}px before the chevron`);
       assert.ok(m.box.rect.h >= 24, 'at least 24px tall');
+      const widths = await p.tab.evaluate(`['system', 'classic-light', 'classic-dark'].map((id) => {
+        dispatchEvent(new CustomEvent('site-theme-change', { detail: id }));
+        return document.querySelector('site-theme-picker').shadowRoot.querySelector('[role=combobox]').getBoundingClientRect().width;
+      })`);
+      assert.ok(Math.max(...widths) - Math.min(...widths) < 0.5, `the control keeps one width whatever the choice (${widths.join(', ')})`);
     });
   }
 

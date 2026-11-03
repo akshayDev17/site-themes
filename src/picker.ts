@@ -51,6 +51,9 @@ const STYLE = `
   border: 1px solid var(--card-line, #818A9F); border-radius: 4px;
   cursor: pointer; user-select: none; -webkit-user-select: none; white-space: nowrap;
 }
+.value { display: grid; }
+.value > span { grid-area: 1 / 1; }
+.sizer { visibility: hidden; }
 .trigger:focus-visible { outline: 2px solid var(--focus, #0F1220); outline-offset: 2px; }
 .chevron { flex: none; width: .75em; min-width: 8px; height: auto; aspect-ratio: 10 / 6; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .list {
@@ -71,7 +74,7 @@ const STYLE = `
   background: color-mix(in srgb, var(--text, #0F1220) 10%, var(--card, #FFFFFF));
   box-shadow: inset 0 0 0 2px var(--focus, #0F1220);
 }
-.visually-hidden, .mirror {
+.visually-hidden {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
 }`;
@@ -103,10 +106,6 @@ function icon(doc: Document, cls: string, viewBox: string, d: string): SVGSVGEle
  * - `hide-label`: keep the label for screen readers only.
  * Shadow parts `label`, `select` (the control), `listbox` and `option` can be
  * styled with ::part().
- *
- * The shadow root also keeps a hidden, inert native <select> inside a <label>,
- * in sync with the choice: it is not shown, focused or announced, and is there
- * for scripts and tests that read or set the choice through `select.value`.
  */
 export function defineThemePicker(w: Win = window): void {
   if (w.customElements.get(PICKER_TAG)) return;
@@ -120,8 +119,6 @@ export function defineThemePicker(w: Win = window): void {
     #valueText: HTMLSpanElement;
     #list: HTMLDivElement;
     #options: HTMLDivElement[];
-    #mirror: HTMLSelectElement;
-    #mirrorText: HTMLSpanElement;
     #popover: boolean;
     #value = SYSTEM_CHOICE;
     #active = 0;
@@ -160,8 +157,19 @@ export function defineThemePicker(w: Win = window): void {
       this.#trigger.setAttribute('aria-controls', 'listbox');
       this.#trigger.setAttribute('aria-labelledby', 'label');
       this.#valueText = doc.createElement('span');
-      this.#valueText.className = 'value';
-      this.#trigger.append(this.#valueText, icon(doc, 'chevron', '0 0 10 6', CHEVRON));
+      this.#valueText.className = 'current';
+      const value = doc.createElement('span');
+      value.className = 'value';
+      value.append(
+        this.#valueText,
+        ...options.map(([, text]) => {
+          const sizer = doc.createElement('span');
+          sizer.className = 'sizer';
+          sizer.textContent = text;
+          return sizer;
+        }),
+      );
+      this.#trigger.append(value, icon(doc, 'chevron', '0 0 10 6', CHEVRON));
 
       this.#list = doc.createElement('div');
       this.#list.id = 'listbox';
@@ -188,21 +196,6 @@ export function defineThemePicker(w: Win = window): void {
       if (this.#popover) this.#list.setAttribute('popover', 'manual');
       else this.#list.hidden = true;
 
-      const mirrorLabel = doc.createElement('label');
-      mirrorLabel.className = 'mirror';
-      mirrorLabel.setAttribute('aria-hidden', 'true');
-      mirrorLabel.setAttribute('inert', '');
-      this.#mirrorText = doc.createElement('span');
-      this.#mirror = doc.createElement('select');
-      this.#mirror.tabIndex = -1;
-      for (const [value, text] of options) {
-        const option = doc.createElement('option');
-        option.value = value;
-        option.textContent = text;
-        this.#mirror.append(option);
-      }
-      mirrorLabel.append(this.#mirrorText, this.#mirror);
-
       this.#trigger.addEventListener('click', () => (this.#isOpen() ? this.#close() : this.#open(this.#selectedIndex())));
       this.#trigger.addEventListener('keydown', (e) => this.#onKey(e));
       this.#trigger.addEventListener('blur', () => this.#close());
@@ -217,9 +210,8 @@ export function defineThemePicker(w: Win = window): void {
         const option = (e.target as Element).closest?.('.option');
         if (option) this.#choose(this.#options.indexOf(option as HTMLDivElement));
       });
-      this.#mirror.addEventListener('change', () => setThemeChoice(this.#mirror.value, w));
 
-      root.append(style, this.#label, this.#trigger, this.#list, mirrorLabel);
+      root.append(style, this.#label, this.#trigger, this.#list);
       this.#renderLabel();
       this.#show(SYSTEM_CHOICE);
     }
@@ -242,9 +234,7 @@ export function defineThemePicker(w: Win = window): void {
     }
 
     #renderLabel() {
-      const text = this.getAttribute('label') ?? 'Theme';
-      this.#label.textContent = text;
-      this.#mirrorText.textContent = text;
+      this.#label.textContent = this.getAttribute('label') ?? 'Theme';
       this.#label.className = this.hasAttribute('hide-label') ? 'visually-hidden' : '';
     }
 
@@ -254,7 +244,6 @@ export function defineThemePicker(w: Win = window): void {
       this.#value = options[index][0];
       this.#valueText.textContent = options[index][1];
       this.#options.forEach((o, i) => o.setAttribute('aria-selected', String(i === index)));
-      this.#mirror.value = this.#value;
     }
 
     #selectedIndex() {

@@ -15,10 +15,6 @@ export declare function setThemeChoice(choice: string, w?: Win): string;
  * - `hide-label`: keep the label for screen readers only.
  * Shadow parts `label`, `select` (the control), `listbox` and `option` can be
  * styled with ::part().
- *
- * The shadow root also keeps a hidden, inert native <select> inside a <label>,
- * in sync with the choice: it is not shown, focused or announced, and is there
- * for scripts and tests that read or set the choice through `select.value`.
  */
 export declare function defineThemePicker(w?: Win): void;
 export {};
