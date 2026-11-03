@@ -4,7 +4,7 @@
 // A page wider than a phone's screen grows the layout viewport past the screen
 // (here to about 580x1256), and the fixed sheet is placed in the layout
 // viewport; the sheet must still sit inside the visual viewport, Close included,
-// before and after the page is panned.
+// before and after the page is panned, and when it is pinch-zoomed in.
 //
 //   npm run build && npm run test:sheet      (CHROME_PATH picks the browser)
 import assert from 'node:assert/strict';
