@@ -48,7 +48,7 @@ test('the site row is just the five apps, in list order, each a link to its root
   const { doc, nav, row } = render(sitePathMarkup('atlas'));
   assert.equal(nav.getAttribute('aria-label'), 'Site');
   assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas']);
-  assert.deepEqual(row.map((a) => a.getAttribute('href')), ['/', '/chat-archives', '/quiz', '/graph/', '/elections/india/']);
+  assert.deepEqual(row.map((a) => a.getAttribute('href')), ['/', '/chat-archives', '/quiz', '/graph/', '/elections/']);
   assert.equal(nav.children.length, 1, 'the row is the only thing in the site nav');
   const shown = [...doc.querySelectorAll('nav')].map((n) => n.textContent).join('');
   assert.ok(!shown.includes('akshayprabhakant.com'), 'no site name');
@@ -104,21 +104,35 @@ test('deeper in an app, the page name goes on its own line under the row, never 
   assert.equal(doc.querySelectorAll('[aria-current="page"]').length, 1, 'aria-current="page" only on the true current page');
 });
 
-test('the atlas trail starts at its own root crumb: "India › Uttar Pradesh"', () => {
+test('Election Atlas links to /elections/ and is the current app there and on every country page', () => {
+  const root = render(sitePathMarkup('atlas'));
+  assert.equal(root.row[4].getAttribute('href'), '/elections/');
+  assert.equal(root.row[4].getAttribute('aria-current'), 'page', 'at /elections/ (an empty data-tail)');
+  assert.equal(root.trail, null);
+  const national = render(sitePathMarkup('atlas', [{ label: 'India' }]));
+  assert.equal(national.row[4].getAttribute('aria-current'), 'true', 'below the root, on /elections/india/');
+  assert.deepEqual(national.crumbs.map((li) => li.textContent), ['Election Atlas', 'India']);
+  assert.equal(national.crumbs[0].querySelector('a')!.getAttribute('href'), '/elections/');
+  assert.equal(national.crumbs[1].firstElementChild!.getAttribute('aria-current'), 'page');
+});
+
+test('the atlas trail is led by the app: "Election Atlas › India › Uttar Pradesh"', () => {
   const { row, crumbs } = render(sitePathMarkup('atlas', STATE_TAIL));
   assert.equal(row[4].getAttribute('aria-current'), 'true');
-  assert.deepEqual(crumbs.map((li) => li.textContent), ['India', 'Uttar Pradesh']);
-  assert.equal(crumbs[0].querySelector('a')!.getAttribute('href'), '/elections/india/');
+  assert.deepEqual(crumbs.map((li) => li.textContent), ['Election Atlas', 'India', 'Uttar Pradesh']);
+  assert.deepEqual(crumbs.map((li) => li.querySelector('a')?.getAttribute('href') ?? null), ['/elections/', '/elections/india/', null]);
   const seat = render(sitePathMarkup('atlas', [STATE_TAIL[0], { label: 'Uttar Pradesh', href: '/elections/india/state/?s=IN-UP' }, { label: 'Gorakhpur' }]));
-  assert.deepEqual(seat.crumbs.map((li) => li.textContent), ['India', 'Uttar Pradesh', 'Gorakhpur']);
-  assert.deepEqual(seat.crumbs.map((li) => li.querySelector('a')?.getAttribute('href') ?? null), ['/elections/india/', '/elections/india/state/?s=IN-UP', null]);
+  assert.deepEqual(seat.crumbs.map((li) => li.textContent), ['Election Atlas', 'India', 'Uttar Pradesh', 'Gorakhpur']);
+  assert.deepEqual(seat.crumbs.map((li) => li.querySelector('a')?.getAttribute('href') ?? null), ['/elections/', '/elections/india/', '/elections/india/state/?s=IN-UP', null]);
 });
 
 test('trailOf: led by the app unless the first crumb links to its root; nothing at the root or for a lone crumb', () => {
   assert.deepEqual(trailOf(app('quiz'), []), []);
   assert.deepEqual(trailOf(app('quiz'), [{ label: 'History' }]), [{ label: 'Quiz Room', href: '/quiz' }, { label: 'History' }]);
-  assert.deepEqual(trailOf(app('atlas'), STATE_TAIL), STATE_TAIL);
-  assert.deepEqual(trailOf(app('atlas'), [{ label: 'India', href: '/elections/india/' }]), [], 'a lone crumb says nothing the row does not');
+  assert.deepEqual(trailOf(app('atlas'), STATE_TAIL), [{ label: 'Election Atlas', href: '/elections/' }, ...STATE_TAIL]);
+  const rooted: Crumb[] = [{ label: 'Quiz Room', href: '/quiz' }, { label: 'History' }];
+  assert.deepEqual(trailOf(app('quiz'), rooted), rooted, 'a first crumb at the app root is not repeated');
+  assert.deepEqual(trailOf(app('quiz'), rooted.slice(0, 1)), [], 'a lone crumb says nothing the row does not');
   // A crumb with no link between the first and the last stays plain text.
   const { crumbs } = render(sitePathMarkup('chat', [{ label: 'Archive' }, { label: 'Front page' }]));
   assert.deepEqual(crumbs.map((li) => li.firstElementChild!.tagName), ['A', 'SPAN', 'SPAN']);
@@ -206,7 +220,7 @@ test('the homepage list: the listed apps other than Home, gated ones marked for 
   const items = [...doc.querySelectorAll('ul.site-apps > li')];
   assert.deepEqual(items.map((li) => li.getAttribute('data-app')), ['chat', 'quiz', 'graph', 'atlas']);
   assert.deepEqual(items.map((li) => li.hasAttribute('data-gated')), [false, true, true, false]);
-  assert.deepEqual(items.map((li) => li.querySelector('a')!.getAttribute('href')), ['/chat-archives', '/quiz', '/graph/', '/elections/india/']);
+  assert.deepEqual(items.map((li) => li.querySelector('a')!.getAttribute('href')), ['/chat-archives', '/quiz', '/graph/', '/elections/']);
   assert.ok(accessibleName(items[1].querySelector('a')!).includes(GATED));
 });
 

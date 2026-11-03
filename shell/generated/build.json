@@ -5,7 +5,7 @@
     "site.js"
   ],
   "apps": {
-    "json": "[{\"id\":\"home\",\"label\":\"Home\",\"path\":\"/\",\"blurb\":\"Work, research and contact\",\"gated\":false},{\"id\":\"chat\",\"label\":\"AI Digest\",\"path\":\"/chat-archives\",\"blurb\":\"AI chat sessions filed as a newspaper\",\"gated\":false},{\"id\":\"quiz\",\"label\":\"Quiz Room\",\"path\":\"/quiz\",\"blurb\":\"Timed multiple-choice quizzes\",\"gated\":true},{\"id\":\"graph\",\"label\":\"Graph Notes\",\"path\":\"/graph/\",\"blurb\":\"Personal notes as a linked graph\",\"gated\":true},{\"id\":\"atlas\",\"label\":\"Election Atlas\",\"path\":\"/elections/india/\",\"blurb\":\"Every Lok Sabha and assembly result\",\"gated\":false}]",
-    "etag": "\"2ff71ef76a592ea4\""
+    "json": "[{\"id\":\"home\",\"label\":\"Home\",\"path\":\"/\",\"blurb\":\"Work, research and contact\",\"gated\":false},{\"id\":\"chat\",\"label\":\"AI Digest\",\"path\":\"/chat-archives\",\"blurb\":\"AI chat sessions filed as a newspaper\",\"gated\":false},{\"id\":\"quiz\",\"label\":\"Quiz Room\",\"path\":\"/quiz\",\"blurb\":\"Timed multiple-choice quizzes\",\"gated\":true},{\"id\":\"graph\",\"label\":\"Graph Notes\",\"path\":\"/graph/\",\"blurb\":\"Personal notes as a linked graph\",\"gated\":true},{\"id\":\"atlas\",\"label\":\"Election Atlas\",\"path\":\"/elections/\",\"blurb\":\"Election results by country\",\"gated\":false}]",
+    "etag": "\"46d82047bf95a230\""
   }
 }

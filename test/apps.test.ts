@@ -13,7 +13,7 @@ test('the list is valid, in the owner-approved order, and every app starts liste
       ['chat', 'AI Digest', '/chat-archives', false, true],
       ['quiz', 'Quiz Room', '/quiz', true, true],
       ['graph', 'Graph Notes', '/graph/', true, true],
-      ['atlas', 'Election Atlas', '/elections/india/', false, true],
+      ['atlas', 'Election Atlas', '/elections/', false, true],
     ],
   );
 });

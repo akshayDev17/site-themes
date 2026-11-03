@@ -172,7 +172,7 @@ for (const theme of THEMES) {
         else {
           assert.ok(m.trail.top >= m.row.bottom - 0.5, `the trail is under the row, not beside it: ${m.trail.top} vs ${m.row.bottom}`);
           assert.ok(m.trail.bottom - m.trail.top < 40, 'the trail is one line');
-          assert.equal(m.trail.text, name === 'quiz-history' ? 'Quiz Room › History' : 'India › Uttar Pradesh');
+          assert.equal(m.trail.text, name === 'quiz-history' ? 'Quiz Room › History' : 'Election Atlas › India › Uttar Pradesh');
         }
 
         for (const [what, color] of [...m.links.map((l) => [l.text, l.color]), ...(m.trail?.colors ?? []).map((c) => ['trail', c])]) {

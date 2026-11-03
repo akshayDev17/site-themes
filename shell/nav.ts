@@ -5,7 +5,7 @@
 //   <site-slot name="site-path" data-tail='[{"label":"India","href":"/elections/india/"}]'>
 //     the site row, "Home  AI Digest  Quiz Room  Graph Notes  Election Atlas", with
 //     the current app marked, and under it, on its own line, the page's trail
-//     (a breadcrumb such as "India › Uttar Pradesh") drawn from data-tail. The
+//     (a breadcrumb such as "Election Atlas › India › Uttar Pradesh") drawn from data-tail. The
 //     row sits inline wherever it fits; where it does not (a portrait phone) it
 //     scrolls sideways as one line, and site.js scrolls the current app into view
 //     and fades the edge that has more apps past it.
@@ -107,7 +107,7 @@ function rowItem(app: App, current: boolean, atAppRoot: boolean): string {
 
 /**
  * The page's trail: the app's crumbs, led by the app itself (a link to its root)
- * unless the first crumb already links there, as the atlas's "India" does. Empty
+ * unless the first crumb already links there. Empty
  * at the app's root, and when that leaves a single crumb, which says nothing the
  * row does not.
  */

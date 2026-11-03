@@ -16,7 +16,7 @@ export const APPS = [
     { id: 'chat', label: 'AI Digest', path: '/chat-archives', blurb: 'AI chat sessions filed as a newspaper', gated: false, listed: true },
     { id: 'quiz', label: 'Quiz Room', path: '/quiz', blurb: 'Timed multiple-choice quizzes', gated: true, listed: true },
     { id: 'graph', label: 'Graph Notes', path: '/graph/', blurb: 'Personal notes as a linked graph', gated: true, listed: true },
-    { id: 'atlas', label: 'Election Atlas', path: '/elections/india/', blurb: 'Every Lok Sabha and assembly result', gated: false, listed: true },
+    { id: 'atlas', label: 'Election Atlas', path: '/elections/', blurb: 'Election results by country', gated: false, listed: true },
 ];
 /** The same pattern compose() applies to its `app` option. */
 export const APP_ID = /^[a-z0-9-]{1,32}$/;
