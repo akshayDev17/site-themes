@@ -2,7 +2,9 @@
 //
 //   shell/public/_site/<id>/site.js     the picker (esbuild bundle of shell/client/site.ts)
 //   shell/public/_headers               one-year immutable caching for /_site/*
-//   shell/generated/build.json          { id, inline, scripts } read by the Worker
+//   shell/generated/build.json          { id, inline, scripts, apps } read by the Worker
+//
+// apps is /_site/apps.json, the listed apps from src/apps.ts, with its ETag.
 //
 // The theme tokens are only inline (in build.json): a composed page needs no
 // stylesheet request for its first paint.
@@ -19,6 +21,7 @@ import { APPS, validateApps } from '../src/apps.js';
 import { buildBootScript } from '../src/boot.js';
 import { generateCss, themeDeclarations } from '../src/css.js';
 import { BASE_THEME_ID, THEMES } from '../src/themes.js';
+import { listedAppsJson } from '../shell/nav.js';
 import { keptBuilds, releasedBuilds } from './shell-builds.js';
 
 const KEEP = 3;
@@ -68,7 +71,11 @@ for (const dir of readdirSync(site, { withFileTypes: true })) {
 }
 writeFileSync(orderFile, kept.join('\n') + '\n');
 
-writeFileSync(new URL('generated/build.json', shell), JSON.stringify({ id, inline, scripts: ['site.js'] }, null, 2) + '\n');
+// Not part of <id>: the list is served at a fixed URL with a short cache, not
+// under /_site/<id>/.
+const appsJson = listedAppsJson(APPS);
+const apps = { json: appsJson, etag: `"${createHash('sha256').update(appsJson).digest('hex').slice(0, 16)}"` };
+writeFileSync(new URL('generated/build.json', shell), JSON.stringify({ id, inline, scripts: ['site.js'], apps }, null, 2) + '\n');
 // The one-time safety net each app copies into its own CSS: Classic Light at
 // zero specificity, so it applies only when compose() did not run.
 const base = THEMES.find((t) => t.id === BASE_THEME_ID)!;

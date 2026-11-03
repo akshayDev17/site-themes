@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { JSDOM } from 'jsdom';
 import { APPS, type App } from '../src/apps.js';
-import { SHEET_ID, isUnlisted, parseTail, siteAppsMarkup, sitePathMarkup, slotMarkup, type Crumb } from '../shell/nav.js';
+import { SHEET_ID, isUnlisted, listedAppsJson, parseTail, siteAppsMarkup, sitePathMarkup, slotMarkup, type Crumb } from '../shell/nav.js';
 
 const GATED = '(invite-only, sign-in required)';
 
@@ -160,6 +160,15 @@ test('listed:false: the app says "Not listed" on its own switcher and is absent 
   }
   const list = new JSDOM(siteAppsMarkup(apps)).window.document;
   assert.deepEqual([...list.querySelectorAll('li')].map((li) => li.getAttribute('data-app')), ['chat', 'quiz', 'atlas']);
+  assert.deepEqual(JSON.parse(listedAppsJson(apps)).map((a: App) => a.id), ['home', 'chat', 'quiz', 'atlas'], '/_site/apps.json leaves it out too');
+});
+
+test('/_site/apps.json: every listed app in list order, with exactly what the Apps cards render', () => {
+  assert.deepEqual(
+    JSON.parse(listedAppsJson()),
+    APPS.map(({ id, label, path, blurb, gated }) => ({ id, label, path, blurb, gated })),
+  );
+  assert.deepEqual(JSON.parse(listedAppsJson()).map((a: App) => a.id), ['home', 'chat', 'quiz', 'graph', 'atlas']);
 });
 
 test('the slot styles: Newsreader at 15 px in sentence case, 44 px targets, the folds at 900 and 640 px', () => {
