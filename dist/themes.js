@@ -74,64 +74,6 @@ export const THEMES = [
         radius: { card: '.7rem' },
         font: classicFonts,
     },
-    {
-        // graph-notes' light palette (frontend/app/globals.css :root).
-        id: 'slate-light',
-        label: 'Slate Light',
-        scheme: 'light',
-        color: {
-            surface: '#F8FAFC',
-            // graph-notes has two surfaces, bg and card; any tint darker than bg
-            // would drop its muted text below 4.5:1, so surface2 is the card white.
-            surface2: '#FFFFFF',
-            card: '#FFFFFF',
-            text: '#0F172A',
-            textBody: '#1E293B',
-            textMuted: '#64748B',
-            line: '#CBD5E1',
-            lineStrong: '#94A3B8',
-            cardLine: '#64748B',
-            cardLineHover: '#475569',
-            accent: '#3E63DD',
-            focus: '#3E63DD',
-            danger: '#B91C1C',
-            warn: '#C2410C',
-            ok: '#30A46C',
-        },
-        shadow: {
-            rest: '0 1px 2px rgb(15 23 42 / .06), 0 8px 30px -14px rgb(15 23 42 / .15)',
-            hover: '0 2px 4px rgb(15 23 42 / .08), 0 8px 30px rgb(15 23 42 / .15)',
-        },
-        radius: { card: '12px' },
-    },
-    {
-        // graph-notes' dark palette (its prefers-color-scheme: dark block).
-        id: 'slate-dark',
-        label: 'Slate Dark',
-        scheme: 'dark',
-        color: {
-            surface: '#0B1120',
-            surface2: '#0F172A',
-            card: '#111827',
-            text: '#E2E8F0',
-            textBody: '#CBD5E1',
-            textMuted: '#94A3B8',
-            line: '#334155',
-            lineStrong: '#475569',
-            cardLine: '#64748B',
-            cardLineHover: '#94A3B8',
-            accent: '#7C9CFF',
-            focus: '#7C9CFF',
-            danger: '#F87171',
-            warn: '#FB923C',
-            ok: '#4CC38A',
-        },
-        shadow: {
-            rest: '0 1px 2px rgb(0 0 0 / .4), 0 8px 30px -14px rgb(0 0 0 / .6)',
-            hover: '0 2px 4px rgb(0 0 0 / .45), 0 8px 30px rgb(0 0 0 / .6)',
-        },
-        radius: { card: '12px' },
-    },
 ];
 /** The theme on `:root`: what a page shows before (or without) any choice. */
 export const BASE_THEME_ID = 'classic-light';

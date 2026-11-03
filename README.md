@@ -21,10 +21,8 @@ Build-time shared themes for the akshayprabhakant.com apps (homepage, chat archi
 |---|---|---|---|
 | `classic-light` | Classic Light | light | Today's shared palette (home, quiz, chat archive, atlas) |
 | `classic-dark` | Classic Dark | dark | Classic inverted. The Classic ink becomes the surface. |
-| `slate-light` | Slate Light | light | graph-notes' light palette |
-| `slate-dark` | Slate Dark | dark | graph-notes' dark palette |
 
-graph-notes has only two surfaces (`bg` and `card`). Slate Light's `surface2` therefore reuses the card white: any tint darker than `bg` would push graph-notes' muted text below 4.5:1.
+The picker offers **System** (the default), **Classic Light** and **Classic Dark**. System maps to Classic Light or Classic Dark through `prefers-color-scheme`.
 
 **What a theme may change:** colour roles and `color-scheme`, elevation (shadows), shape (card radius), and fonts. Fonts must come from `VETTED_FONTS`, and the build rejects anything else.
 **What a theme must not change:** layout, spacing, type sizes, DOM order, and data colours (party colours, graph cluster colours). There are no tokens for these, so a theme cannot change them.
@@ -59,7 +57,7 @@ Do not redefine the package's own names (`--accent`, `--card`, `--text`, …) in
 
 - One `localStorage` key, **`site-theme`**, on the single origin `https://akshayprabhakant.com`. Its value is `system` (the default) or a theme id. Every app on the origin reads the same key, so a choice made in one app carries over to the next with no signal between apps.
 - **System** maps to `classic-light` or `classic-dark` through `prefers-color-scheme`, and follows OS changes live.
-- An unknown stored id falls back to System, for example a theme removed in a later release or a typo. So do a missing key and storage that is missing or throws.
+- An unknown stored id falls back to System, for example a theme removed in a later release or a typo. So do a missing key and storage that is missing or throws. The Slate themes (`slate-light`, `slate-dark`) were removed in 0.2.0, so a stored slate id now lands on System with no flash and no error.
 - Open tabs follow a change through the `storage` event. Pickers on the same page stay in sync through a `site-theme-change` window event.
 - `data-theme` always holds the resolved theme id. In System mode that is `classic-light` or `classic-dark`, never `system`.
 
@@ -70,10 +68,10 @@ Accepted limits: the Cloudflare Access login pages cannot follow the theme. An i
 Install straight from GitHub. The npm registry is not involved, and the package is never published there (`"private": true`).
 
 ```sh
-npm install github:akshayDev17/site-themes#v0.1.0
+npm install github:akshayDev17/site-themes#v0.2.0
 ```
 
-This writes `"site-themes": "github:akshayDev17/site-themes#v0.1.0"` into the app's `package.json`.
+This writes `"site-themes": "github:akshayDev17/site-themes#v0.2.0"` into the app's `package.json`.
 
 **Built output is committed.** `dist/` (JS, `.d.ts` and `themes.css`) is checked in, and the package has no `prepare` or `install` script. A git install therefore copies ready files with no build step, and no TypeScript runs on the app side. CI fails any PR whose committed `dist/` does not match a fresh build.
 
@@ -176,6 +174,11 @@ The CSS, the boot script's id list and the picker's options all derive from the 
 - Each app pins a tag in its `package.json` and gets an automated bump PR when a newer tag lands. The recommended setup is Renovate in each app. Its npm manager updates `github:owner/repo#vX.Y.Z` dependencies to newer semver tags. A small scheduled workflow that compares the pinned tag with `gh api repos/akshayDev17/site-themes/tags` and opens a PR also works.
 - Each app sets up its bump automation in its own wiring PR. It does not live in this repository.
 - After a bump, the app rebuilds and redeploys. That is the only way a new theme reaches it, because nothing is fetched at runtime.
+
+## Changelog
+
+- **0.2.0**: removed the Slate Light (`slate-light`) and Slate Dark (`slate-dark`) themes. The catalogue is now Classic Light and Classic Dark, with System as the default. A stored slate id falls back to System (Classic Light or Classic Dark through `prefers-color-scheme`). Every export and token name is unchanged, so an app bumps with no code change.
+- **0.1.0**: first release, with Classic Light, Classic Dark, Slate Light and Slate Dark.
 
 ## Development
 
