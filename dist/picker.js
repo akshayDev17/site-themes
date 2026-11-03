@@ -69,6 +69,9 @@ const STYLE = `
   background: color-mix(in srgb, var(--text, #0F1220) 10%, var(--card, #FFFFFF));
   box-shadow: inset 0 0 0 2px var(--focus, #0F1220);
 }
+@media (forced-colors: active) {
+  .option.active { outline: 2px solid Highlight; outline-offset: -2px; }
+}
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;

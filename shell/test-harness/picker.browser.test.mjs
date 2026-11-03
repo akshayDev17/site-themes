@@ -40,7 +40,7 @@ let chrome;
 before(async () => (chrome = await launchChrome()));
 after(async () => {
   await chrome?.close();
-  if (shots !== scratch) rmSync(scratch, { recursive: true, force: true });
+  rmSync(scratch, { recursive: true, force: true });
 });
 
 async function open(theme, size = 16) {
@@ -187,6 +187,22 @@ for (const theme of ['classic-light', 'classic-dark']) {
     assert.equal(m.theme, other, 'type-ahead and Enter choose');
     assert.equal(await p.tab.evaluate("localStorage.getItem('site-theme')"), other);
     assert.equal(m.expanded, 'false');
+  });
+
+  test(`${theme}: in forced colours the keyboard highlight is still drawn, as a Highlight outline`, async (t) => {
+    const p = await open(theme);
+    t.after(() => p.tab.close());
+    await p.tab.call('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }] });
+    assert.equal(await p.tab.evaluate("matchMedia('(forced-colors: active)').matches"), true);
+    await p.tab.evaluate("document.querySelector('a').focus()");
+    await p.press('Tab');
+    await p.press('ArrowDown');
+    await p.press('ArrowDown');
+    const m = await p.measure();
+    assert.equal(m.active?.id, m.activedescendant, 'the keyboard moved the highlight');
+    assert.equal(m.active.style.outline, 'solid', 'the highlighted option has an outline');
+    const others = m.options.filter((o) => o.id !== m.active.id);
+    for (const o of others) assert.equal(o.style.outline, 'none', `${o.id} has no outline`);
   });
 
   test(`${theme}: the pointer highlights the option under it, chooses on click, and a press outside closes`, async (t) => {
