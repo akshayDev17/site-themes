@@ -18,8 +18,9 @@ export interface ComposeOptions {
   /** Which app is calling; recorded in a response header for debugging. */
   app: string;
   /**
-   * Where /_site/ assets are reachable from this app's pages. '/_site/' once the
-   * zone route is attached; '<app prefix>/_site/' while the app forwards them.
+   * Where /_site/ assets are reachable from this app's pages: '<app prefix>/_site/'
+   * while the app forwards them. site-shell's ASSET_BASE ('/_site/', the zone
+   * route) takes precedence when set.
    */
   assetBase?: string;
 }
@@ -40,11 +41,13 @@ export function headMarkup(build: Build, assetBase = '/_site/'): string {
 
 /**
  * Returns the composed response, or `res` itself for anything that is not a
- * 200 HTML page. Validators are dropped: the body now depends on this build as
- * well as on the app's file, so the app's ETag no longer describes it.
+ * 200 HTML page or that is composed already (it carries `x-site-shell`; for
+ * example the workers.dev copy of the homepage fetching the routed one).
+ * Validators are dropped: the body now depends on this build as well as on the
+ * app's file, so the app's ETag no longer describes it.
  */
 export function composeResponse(res: Response, opts: ComposeOptions, build: Build): Response {
-  if (!isHtml(res)) return res;
+  if (!isHtml(res) || res.headers.has('x-site-shell')) return res;
   if (!APP.test(opts.app)) throw new Error(`bad app: ${opts.app}`);
   const markup = headMarkup(build, opts.assetBase);
 

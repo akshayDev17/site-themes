@@ -5,12 +5,34 @@
   // the date the app frontends use
   "compatibility_date": "2026-10-10",
 
-  // No "routes": apps reach compose() over a Service Binding, which needs none.
-  // akshayprabhakant.com/_site/* is proposed (owner decision D2-i), not approved.
-  // workers.dev on, so a preview deploy answers at site-shell.<subdomain>.workers.dev
-  // (its /_site/<id>/… files) without touching the zone.
+  // Exactly the two routes the owner approved, and nothing else (never
+  // akshayprabhakant.com/*):
+  // - /_site/*: the shared files; any path there that is not a file is a 404.
+  // - the exact / (the homepage only): composed from GitHub Pages, failing open
+  //   to Pages. A pattern matches the whole URL, query included, so /?anything
+  //   is not routed and GitHub Pages serves it as before.
+  // Apps reach compose() over a Service Binding, which needs no route.
+  // Rollback: detach both routes in the Cloudflare dashboard (Workers & Pages →
+  // site-shell → Settings → Domains & Routes); traffic returns to GitHub Pages.
+  // Then remove them here too: a deploy with no routes leaves attached routes
+  // as they are, and a deploy with these entries attaches them again.
+  "routes": [
+    { "pattern": "akshayprabhakant.com/_site/*", "zone_name": "akshayprabhakant.com" },
+    { "pattern": "akshayprabhakant.com/", "zone_name": "akshayprabhakant.com" }
+  ],
+  // workers.dev on, so a preview version answers at its own Version URL, and
+  // the composed homepage can be checked there before it is live.
   "workers_dev": true,
   "preview_urls": true,
+
+  "vars": {
+    // Composed pages load /_site/<build>/… from the routed shared URL, whatever
+    // prefix the app forwards.
+    "ASSET_BASE": "/_site/",
+    // The homepage's origin. On the zone's / route a fetch to the same zone goes
+    // to the DNS origin (GitHub Pages), not back to this Worker.
+    "HOME_ORIGIN": "https://akshayprabhakant.com"
+  },
 
   // The inline boot script is built in Node (scripts/build-shell.ts) and read
   // from generated/build.json, never from Function#toString() inside this
@@ -18,7 +40,8 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS"
-    // No run_worker_first: /_site/<id>/… is served without running the Worker.
+    // No run_worker_first: /_site/<id>/… is served without running the Worker;
+    // there is no index.html, so / always reaches the Worker.
   },
 
   "observability": { "enabled": true }

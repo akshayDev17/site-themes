@@ -1,6 +1,7 @@
-# Uploads and deploys the site-shell Worker (shell/). It has no route: nothing on
-# akshayprabhakant.com reaches it until an app binds it (SHELL) or the owner
-# approves akshayprabhakant.com/_site/*.
+# Uploads and deploys the site-shell Worker (shell/). A deploy also attaches its
+# two routes from shell/wrangler.jsonc: akshayprabhakant.com/_site/* (the shared
+# files) and the exact akshayprabhakant.com/ (the homepage, composed from GitHub
+# Pages). No app binds it yet.
 #
 # - pull_request (this repo's branches): `wrangler versions upload` with a per-PR
 #   alias. The version is NOT deployed; it answers only at its own Version URL,
@@ -9,7 +10,9 @@
 #   first merge to main creates it) the PR run skips the upload and smoke test
 #   with a notice.
 # - push to main, or a manual run on main: `wrangler deploy`, live at
-#   site-shell.<subdomain>.workers.dev and to every app that binds SHELL.
+#   site-shell.<subdomain>.workers.dev, on the two routes, and to every app that
+#   binds SHELL. Attaching the routes needs the token to edit Workers routes on
+#   the akshayprabhakant.com zone. The run then checks both routes live.
 #
 # Uses the GitHub environment `production` (the place the app repos keep theirs):
 # secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, and the variable
@@ -163,6 +166,28 @@ jobs:
             sleep 10
           done
           echo "::error::$URL does not serve /_site/$id/site.js"
+          exit 1
+
+      - name: Check the routes live (main)
+        if: steps.deploy.outputs.url
+        run: |
+          # /_site/<id>/site.js immutable, a missing /_site/ path 404 no-store,
+          # and / composed by this build (x-site-shell). Route changes can take a
+          # few seconds to reach every edge, so retry before failing.
+          id=$(node -p "require('./shell/generated/build.json').id")
+          site=https://akshayprabhakant.com
+          check() {
+            curl -fsSI "$site/_site/$id/site.js" | grep -qi 'cache-control: public, max-age=31536000, immutable' || return 1
+            miss=$(curl -sSI "$site/_site/000000000000/site.js") || return 1
+            printf '%s\n' "$miss" | head -1 | grep -q ' 404' || return 1
+            printf '%s\n' "$miss" | grep -qi 'cache-control: no-store' || return 1
+            curl -fsS -D - -o /dev/null "$site/" | grep -qi "x-site-shell: $id; app=home" || return 1
+          }
+          for _ in 1 2 3 4 5 6; do
+            if check; then echo "$site/_site/* and $site/ serve build $id"; exit 0; fi
+            sleep 10
+          done
+          echo "::error::$site/_site/* or $site/ is not served by build $id. If the homepage lacks x-site-shell it still works (fail open); see the Worker's logs."
           exit 1
 
       - name: Comment the preview URL (PR)

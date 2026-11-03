@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, test } from 'node:test';
@@ -19,7 +20,9 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 
 const build = () => JSON.parse(readFileSync(join(repo, 'shell/generated/build.json'), 'utf8'));
 const app = (name) => `shell/test-harness/apps/${name}/wrangler.jsonc`;
+// The deployed config: routed, so ASSET_BASE is '/_site/'.
 const SHELL = 'shell/wrangler.jsonc';
+const UNROUTED_SHELL = 'shell/test-harness/shell-unrouted.jsonc';
 const THROWING_SHELL = 'shell/test-harness/shell-throw.jsonc';
 const MIDSTREAM_SHELL = 'shell/test-harness/shell-midstream.jsonc';
 let nextPort = 18801;
@@ -29,9 +32,10 @@ let nextPort = 18801;
  * registry is private to this run: a site-shell left running by any other
  * session would otherwise answer this session's SHELL binding.
  */
-async function session(t, configs) {
+async function session(t, configs, vars = {}) {
   const port = nextPort++;
-  const args = ['dev', ...configs.flatMap((c) => ['-c', c]), '--ip', '127.0.0.1', '--port', String(port),
+  const args = ['dev', ...configs.flatMap((c) => ['-c', c]), ...Object.entries(vars).flatMap(([k, v]) => ['--var', `${k}:${v}`]),
+    '--ip', '127.0.0.1', '--port', String(port),
     '--inspector-port', String(port + 1000), '--persist-to', join(scratch, 'state'), '--log-level', 'info'];
   const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_REGISTRY_PATH: join(scratch, 'registry') };
   const child = spawn(wrangler, args, { cwd: repo, env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -85,7 +89,7 @@ async function assertComposed(s, path, appName, asset, base, meta = META) {
 
 test('chat (as today): compose inserts the head markup after <meta charset> and changes nothing else', async (t) => {
   const s = await session(t, [app('chat'), SHELL]);
-  await assertComposed(s, '/chat-archives', 'chat', 'chat/out/chat-archives.html', '/chat-archives/_site/');
+  await assertComposed(s, '/chat-archives', 'chat', 'chat/out/chat-archives.html', '/_site/');
   const res = await fetch(`${s.base}/chat-archives`);
   assert.equal(res.headers.get('etag'), null, 'composed HTML carries no validator');
   assert.equal((await res.text()).match(/data-site-shell/g).length, 2, 'one boot <script> and one tokens <style>');
@@ -98,7 +102,8 @@ test('chat (as today): compose inserts the head markup after <meta charset> and 
   const revalidated = await fetch(`${s.base}/_next/static/css/060d43116cea3511.css`, { headers: { 'if-none-match': etag } });
   assert.equal(revalidated.status, 304);
 
-  // site-shell's files through the app's own route: immutable; a missing build is never cached.
+  // site-shell's files through the app's own route (still forwarded, now unused by
+  // composed pages): immutable; a missing build is never cached.
   const js = await fetch(`${s.base}/chat-archives/_site/${build().id}/site.js`);
   assert.equal(js.status, 200);
   assert.equal(js.headers.get('cache-control'), 'public, max-age=31536000, immutable');
@@ -178,20 +183,15 @@ test('a fault after the response has started streaming cannot fall back (500 KB 
   assert.equal(r.complete, false, 'never the full page');
 });
 
-test('home: the saved homepage (<meta charset="utf-8">) gets the head markup after its charset and nothing else', async (t) => {
-  const s = await session(t, [app('home'), SHELL]);
-  await assertComposed(s, '/', 'home', 'home/out/index.html', '/_site/', '<meta charset="utf-8">');
-});
-
-test('quiz: /quiz/ composed byte for byte, /quiz/_site/ forwarded', async (t) => {
+test('quiz: /quiz/ composed byte for byte, /quiz/_site/ still forwarded', async (t) => {
   const s = await session(t, [app('quiz'), SHELL]);
-  await assertComposed(s, '/quiz/', 'quiz', 'quiz/out/index.html', '/quiz/_site/');
+  await assertComposed(s, '/quiz/', 'quiz', 'quiz/out/index.html', '/_site/');
   assert.equal((await fetch(`${s.base}/quiz/_site/${build().id}/site.js`)).status, 200);
 });
 
 test('atlas: run_worker_first for the four pages composes the HTML; other files stay static', async (t) => {
   const s = await session(t, [app('atlas'), SHELL]);
-  const base = '/elections/india/_site/';
+  const base = '/_site/';
   await assertComposed(s, '/elections/india/', 'atlas', 'atlas/dist/elections/india/index.html', base);
   for (const path of ['/elections/india/state/', '/elections/india/state/?s=IN-UP&y=2024']) {
     await assertComposed(s, path, 'atlas', 'atlas/dist/elections/india/state/index.html', base);
@@ -204,9 +204,118 @@ test('atlas: run_worker_first for the four pages composes the HTML; other files 
   assert.equal((await fetch(`${s.base}/elections/india/_site/${build().id}/site.js`)).status, 200);
 });
 
-test('graph: /graph/ composed byte for byte, sw.js still no-cache, /graph/_site/ forwarded', async (t) => {
+test('graph: /graph/ composed byte for byte, sw.js still no-cache, /graph/_site/ still forwarded', async (t) => {
   const s = await session(t, [app('graph'), SHELL]);
-  await assertComposed(s, '/graph/', 'graph', 'graph/out/index.html', '/graph/_site/');
+  await assertComposed(s, '/graph/', 'graph', 'graph/out/index.html', '/_site/');
   assert.equal((await fetch(`${s.base}/graph/sw.js`)).headers.get('cache-control'), 'no-cache');
   assert.equal((await fetch(`${s.base}/graph/_site/${build().id}/site.js`)).status, 200);
 });
+
+test('ASSET_BASE unset (before /_site/* was routed): pages load the files through the app\'s own prefix', async (t) => {
+  const s = await session(t, [app('graph'), UNROUTED_SHELL]);
+  await assertComposed(s, '/graph/', 'graph', 'graph/out/index.html', '/graph/_site/');
+});
+
+/**
+ * A stand-in for GitHub Pages, answering with the saved homepage and Pages'
+ * headers. `mode` picks the next answers; every request is recorded.
+ */
+async function fakePages(t) {
+  const page = readFileSync(join(here, 'fixtures/home.html'));
+  const pages = { mode: 'page', seen: [] };
+  const server = createServer((req, res) => {
+    pages.seen.push({ method: req.method, url: req.url, headers: req.headers });
+    const html = { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'max-age=600',
+      etag: '"6a0f0c4e-61a4"', 'last-modified': 'Tue, 03 Nov 2026 05:23:36 GMT' };
+    if (pages.mode === 'redirect') res.writeHead(301, { location: 'https://akshayprabhakant.com/elsewhere/' }).end();
+    else if (pages.mode === 'error') res.writeHead(503, { 'content-type': 'text/html; charset=utf-8' }).end('<p>down</p>');
+    else if (pages.mode === 'composed') res.writeHead(200, { ...html, 'x-site-shell': 'abc; app=home' }).end(page);
+    else if (req.method === 'HEAD') res.writeHead(200, html).end();
+    else res.writeHead(200, html).end(page);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => new Promise((r) => server.close(r)));
+  return { page: page.toString('utf8'), origin: `http://127.0.0.1:${server.address().port}`, set: (m) => (pages.mode = m), seen: pages.seen };
+}
+
+/** The homepage as Pages serves it plus the one insertion after its <meta charset="utf-8">. */
+const homeComposed = (page) => {
+  const meta = '<meta charset="utf-8">';
+  assert.equal(page.split(meta).length, 2, 'the homepage has one <meta charset="utf-8">');
+  return page.replace(meta, meta + markup('/_site/'));
+};
+
+test('home (exact / route): GitHub Pages\' homepage plus the head block, byte for byte, and nothing else', async (t) => {
+  const pages = await fakePages(t);
+  const s = await session(t, [SHELL], { HOME_ORIGIN: pages.origin });
+
+  const res = await fetch(`${s.base}/`, { headers: { 'if-none-match': '"6a0f0c4e-61a4"', 'if-modified-since': 'Tue, 03 Nov 2026 05:23:36 GMT' } });
+  const body = await res.text();
+  assert.equal(res.status, 200);
+  assert.equal(body, homeComposed(pages.page), 'Pages\' bytes plus one insertion');
+  assert.ok(body.indexOf('<meta charset="utf-8">') < 1024, '<meta charset> stays inside the first 1024 bytes');
+  assert.equal(res.headers.get('x-site-shell'), `${build().id}; app=home`);
+  assert.equal(res.headers.get('content-type'), 'text/html; charset=utf-8');
+  assert.equal(res.headers.get('cache-control'), 'max-age=600', 'Pages\' caching is kept');
+  assert.equal(res.headers.get('etag'), null, 'composed HTML carries no validator');
+  assert.equal(res.headers.get('last-modified'), null);
+  const sent = pages.seen.at(-1);
+  assert.equal(sent.url, '/');
+  assert.equal(sent.headers['if-none-match'], undefined, 'a GET asks Pages for the page, never a 304');
+  assert.equal(sent.headers['if-modified-since'], undefined);
+
+  // A query string reaches Pages as sent (on the zone, /?… is not routed at all).
+  assert.equal(await (await fetch(`${s.base}/?ref=nav`)).text(), homeComposed(pages.page));
+  assert.equal(pages.seen.at(-1).url, '/?ref=nav');
+
+  // HEAD passes through as Pages answers it.
+  const head = await fetch(`${s.base}/`, { method: 'HEAD' });
+  assert.equal(head.status, 200);
+  assert.equal(head.headers.get('x-site-shell'), null);
+  assert.equal(pages.seen.at(-1).method, 'HEAD');
+
+  // Only / and /_site/ files are served here; every other path is a 404 that is never cached.
+  for (const path of ['/about', '/index.html', '/_site/', '/_site/000000000000/site.js']) {
+    const miss = await fetch(`${s.base}${path}`);
+    assert.equal(miss.status, 404, path);
+    assert.equal(miss.headers.get('cache-control'), 'no-store', path);
+  }
+  const js = await fetch(`${s.base}/_site/${build().id}/site.js`);
+  assert.equal(js.status, 200);
+  assert.equal(js.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+});
+
+test('home: a forced compose error serves GitHub Pages\' page unchanged', async (t) => {
+  const pages = await fakePages(t);
+  const s = await session(t, [SHELL], { HOME_ORIGIN: pages.origin });
+  const res = await fetch(`${s.base}/`, { headers: { 'x-site-shell-fault': 'compose' } });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('x-site-shell'), null);
+  assert.equal(res.headers.get('etag'), '"6a0f0c4e-61a4"', 'Pages\' own headers');
+  assert.equal(await res.text(), pages.page, 'exactly what Pages served');
+  assert.equal(pages.seen.at(-1).headers['x-site-shell-fault'], undefined, 'the fault header is not forwarded');
+  assert.match(await logMatching(s, /homepage compose failed/), /homepage compose failed, serving GitHub Pages unchanged/);
+});
+
+test('home: Pages redirects, errors and already-composed pages pass through unchanged', async (t) => {
+  const pages = await fakePages(t);
+  const s = await session(t, [SHELL], { HOME_ORIGIN: pages.origin });
+
+  pages.set('redirect');
+  const moved = await fetch(`${s.base}/`, { redirect: 'manual' });
+  assert.equal(moved.status, 301, 'a Pages redirect reaches the browser as one');
+  // wrangler dev rewrites the route's host in Location to its own address; the path is Pages'.
+  assert.equal(new URL(moved.headers.get('location')).pathname, '/elsewhere/');
+
+  pages.set('error');
+  const down = await fetch(`${s.base}/`);
+  assert.equal(down.status, 503);
+  assert.equal(await down.text(), '<p>down</p>');
+
+  // The workers.dev copy fetching the routed homepage gets it composed already: never twice.
+  pages.set('composed');
+  const once = await fetch(`${s.base}/`);
+  assert.equal(once.headers.get('x-site-shell'), 'abc; app=home');
+  assert.equal(await once.text(), pages.page);
+});
+

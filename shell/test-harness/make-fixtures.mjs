@@ -1,5 +1,6 @@
 // Builds the harness apps' asset directories (git-ignored) from the HTML and CSS
-// in fixtures/. home, chat and atlas were saved from the live public pages on
+// in fixtures/ (the homepage test serves fixtures/home.html itself, as a stand-in
+// for GitHub Pages). home, chat and atlas were saved from the live public pages on
 // 2026-11-03. quiz and graph sit behind Access, so quiz.html and graph.html are
 // the index pages of a local static build (`npm ci && npm run build` in
 // frontend/) of quiz-app 6579d3c and graph-notes f9399ec, origin/main on
@@ -30,7 +31,7 @@ const stripTokens = (css) => {
 
 const chatHtml = read('chat.html');
 const chatCss = read('css/060d43116cea3511.css');
-for (const name of ['home', 'chat', 'chat-migrated', 'quiz', 'graph', 'atlas']) rmSync(join(apps, name, name === 'atlas' ? 'dist' : 'out'), { recursive: true, force: true });
+for (const name of ['chat', 'chat-migrated', 'quiz', 'graph', 'atlas']) rmSync(join(apps, name, name === 'atlas' ? 'dist' : 'out'), { recursive: true, force: true });
 
 // chat, as today
 put(join(apps, 'chat/out/chat-archives.html'), chatHtml);
@@ -51,9 +52,6 @@ put(join(apps, 'chat-migrated/out/_next/static/css/060d43116cea3511.css'), strip
 // the same page plus the one-time :where(:root) fallback (README, 'Wiring an app')
 const FALLBACK = readFileSync(join(here, '../generated/fallback.css'), 'utf8').trim();
 put(join(apps, 'chat-migrated/out/chat-archives/with-fallback.html'), migrated.replace('</head>', `<style>${FALLBACK}</style></head>`));
-
-// home, as today, at the root
-put(join(apps, 'home/out/index.html'), read('home.html'));
 
 // quiz, as today
 put(join(apps, 'quiz/out/index.html'), read('quiz.html'));
