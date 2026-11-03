@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import { keptBuilds, parseBuilds } from '../scripts/shell-builds.js';
 import { STORAGE_KEY } from '../src/boot.js';
 import { themeDeclarations } from '../src/css.js';
 import { BASE_THEME_ID, THEMES, THEME_IDS } from '../src/themes.js';
@@ -59,4 +60,18 @@ test('the inline tokens define every theme id, with the base theme on :root; the
 
 test('the inline markup stays small (bytes added to every page)', () => {
   assert.ok(Buffer.byteLength(build.inline) < 4096, `${Buffer.byteLength(build.inline)} B`);
+});
+
+test('retention counts released builds: local rebuilds before a commit never push a released build out', () => {
+  // Production serves A; three local token tweaks build B, C and D before D is committed.
+  const released = ['A'];
+  for (const id of ['B', 'C', 'D']) assert.deepEqual(keptBuilds(released, id, 3), ['A', id]);
+
+  // Rebuilding the committed build changes nothing (a clean checkout in CI).
+  assert.deepEqual(keptBuilds(['A', 'D'], 'D', 3), ['A', 'D']);
+  // A fourth release drops the oldest one only.
+  assert.deepEqual(keptBuilds(['A', 'D', 'E'], 'F', 3), ['D', 'E', 'F']);
+  // An id released earlier moves to the end instead of appearing twice.
+  assert.deepEqual(keptBuilds(['A', 'D', 'E'], 'A', 3), ['D', 'E', 'A']);
+  assert.deepEqual(parseBuilds('A\nD\n'), ['A', 'D']);
 });

@@ -8,14 +8,17 @@
 // stylesheet request for its first paint.
 //
 // <id> is a content hash of everything a composed page gets from this build, so
-// a release that changes any of it is a new URL. The newest KEEP builds stay in
-// public/_site/, so a page composed just before a deploy still finds its files.
+// a release that changes any of it is a new URL. The newest KEEP released builds
+// stay in public/_site/, so a page composed just before a deploy still finds its
+// files (see shell-builds.ts).
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { build as esbuild, transform } from 'esbuild';
 import { buildBootScript } from '../src/boot.js';
 import { generateCss, themeDeclarations } from '../src/css.js';
 import { BASE_THEME_ID, THEMES } from '../src/themes.js';
+import { keptBuilds, parseBuilds } from './shell-builds.js';
 
 const KEEP = 3;
 const root = new URL('../../', import.meta.url);
@@ -53,18 +56,25 @@ writeFileSync(
   ['/_site/*', '  Cache-Control: public, max-age=31536000, immutable', '  X-Content-Type-Options: nosniff', ''].join('\n'),
 );
 
-// Release order, newest last; keep the newest KEEP.
+// Release order, newest last, as committed at HEAD; the working copy only when
+// builds.txt is not committed yet.
 const orderFile = new URL('generated/builds.txt', shell);
+const released = (() => {
+  try {
+    return parseBuilds(execFileSync('git', ['show', 'HEAD:shell/generated/builds.txt'], {
+      cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    }));
+  } catch {
+    return existsSync(orderFile) ? parseBuilds(readFileSync(orderFile, 'utf8')) : [];
+  }
+})();
+const kept = keptBuilds(released, id, KEEP);
 mkdirSync(new URL('generated/', shell), { recursive: true });
-const order = (existsSync(orderFile) ? readFileSync(orderFile, 'utf8').split('\n').filter(Boolean) : []).filter((b) => b !== id);
-order.push(id);
-const kept = order.slice(-KEEP);
 for (const dir of readdirSync(site, { withFileTypes: true })) {
   if (dir.isDirectory() && !kept.includes(dir.name)) rmSync(new URL(`${dir.name}/`, site), { recursive: true, force: true });
 }
 writeFileSync(orderFile, kept.join('\n') + '\n');
 
-mkdirSync(new URL('generated/', shell), { recursive: true });
 writeFileSync(new URL('generated/build.json', shell), JSON.stringify({ id, inline, scripts: ['site.js'] }, null, 2) + '\n');
 // The one-time safety net each app copies into its own CSS: Classic Light at
 // zero specificity, so it applies only when compose() did not run.

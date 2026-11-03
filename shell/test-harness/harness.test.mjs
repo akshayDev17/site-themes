@@ -127,6 +127,17 @@ test('chat (unbound): with no SHELL binding the page is served exactly as built'
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('x-site-shell'), null);
   assert.equal(await res.text(), asBuilt('chat-migrated/out/chat-archives.html'));
+
+  // With the one-time fallback copied in (README, 'Wiring an app'), the uncomposed page still defines Classic Light.
+  const fallback = await fetch(`${s.base}/chat-archives/with-fallback`);
+  const body = await fallback.text();
+  assert.equal(fallback.status, 200);
+  assert.equal(fallback.headers.get('x-site-shell'), null);
+  assert.equal(body, asBuilt('chat-migrated/out/chat-archives/with-fallback.html'));
+  const block = readFileSync(join(repo, 'shell/generated/fallback.css'), 'utf8').split('\n').find((l) => l.startsWith(':where(:root){'));
+  const head = body.slice(0, body.indexOf('</head>'));
+  assert.ok(head.includes(block), 'the generated :where(:root) block is in <head>');
+  assert.equal(head.includes('data-site-shell'), false, 'no shared boot or tokens');
 });
 
 test('chat (bound, site-shell not running): compose rejects and the page is fetched again as built', async (t) => {
