@@ -217,6 +217,15 @@ It also fills two elements an app may place in its body, from the [app list](#th
 | `true` | shown | indexed as usual |
 | `false` (unlisted) | **not shown** | the switcher still shows it, tagged "Not listed"; `noindex`; direct links keep working |
 
+The same list is served as JSON at **`https://akshayprabhakant.com/_site/apps.json`**, for a page compose() does not reach: GitHub Pages serves `/?…` and `/index.html` bare (only the exact `/` is routed), and they must still show the Apps cards without a hand-kept copy of the list. It is an array of every listed app in list order, the homepage first, with exactly the fields the cards render (the homepage list is the entries other than `home`); unlisted apps are left out:
+
+```json
+[{"id":"home","label":"Portfolio","path":"/","blurb":"Work, research and contact","gated":false},
+ {"id":"chat","label":"AI Digest","path":"/chat-archives","blurb":"AI chat sessions filed as a newspaper","gated":false}, …]
+```
+
+`npm run build` writes it, with its ETag, into `shell/generated/build.json`. It answers `GET` and `HEAD` with `Content-Type: application/json; charset=utf-8`, `Cache-Control: public, max-age=300` and a strong `ETag` (a matching `If-None-Match` is a `304`), so a merged list change shows within five minutes of the deploy. Other methods get `405`.
+
 Unlisting is not locking. To make an app private, put it behind Cloudflare Access; `gated: true` only draws the lock and its text. `src/apps.ts` is compiled into `dist/` like the rest of `src/`, but the package does not export it, so it needs no tag.
 
 Nothing else in the page changes: outside the head block and the slots above, the page is byte for byte as the app built it. Responses that are not `200 text/html` pass through untouched. Composed pages drop `ETag` and `Last-Modified`, because the page now depends on the site-shell build too, and carry `x-site-shell: <build>; app=<app>`.
@@ -225,7 +234,7 @@ Nothing else in the page changes: outside the head block and the slots above, th
 
 `npm run build` writes `shell/public/_site/<build>/site.js`, where `<build>` is a content hash of everything a composed page gets from that build. There is no stylesheet: the tokens are inline in the composed page, so its first paint needs no request. `shell/public/_headers` serves them with `Cache-Control: public, max-age=31536000, immutable`. The newest 3 released builds are kept, so a page composed just before a deploy still finds its files. Released means listed in `shell/generated/builds.txt` on `main` (at the branch's merge-base with `origin/main`), since only `main` deploys: a build appends its id to that list, so builds made on a branch, committed or not, never take a slot from a deployed build or push it out. A missing build answers `404` with `no-store`, so it is never cached as missing.
 
-`akshayprabhakant.com/_site/*` routes to site-shell, and its `ASSET_BASE` variable (`/_site/`) makes every composed page load these files from that one URL, whatever `assetBase` the app passes. Any other path under `/_site/` answers `404` with `no-store`. An app may still forward `<its prefix>/_site/…` to `env.SHELL.fetch()` through its own route; that keeps working, and it is what pages use if `ASSET_BASE` is ever unset.
+`akshayprabhakant.com/_site/*` routes to site-shell, and its `ASSET_BASE` variable (`/_site/`) makes every composed page load these files from that one URL, whatever `assetBase` the app passes. Any other path under `/_site/`, except [`/_site/apps.json`](#the-app-list), answers `404` with `no-store`. An app may still forward `<its prefix>/_site/…` to `env.SHELL.fetch()` through its own route; that keeps working, and it is what pages use if `ASSET_BASE` is ever unset.
 
 ### The homepage
 
@@ -310,7 +319,7 @@ The harness runs on local workerd with no Cloudflare account. Each scenario is o
 
 ## Changelog
 
-- **Unreleased**: the app list (`src/apps.ts`), and compose() fills `<site-slot name="site-path">` with the site path switcher and `<site-slot name="site-apps">` with the homepage list; an unlisted app's pages are `noindex`. Pages without a slot are unchanged. Earlier: site-shell is routed at `akshayprabhakant.com/_site/*` (composed pages load `/_site/<build>/` through `ASSET_BASE`) and the exact `akshayprabhakant.com/`, where it composes the GitHub Pages homepage and fails open to Pages. Earlier: added site-shell (`shell/`, `scripts/build-shell.ts`), the theme-only composition Worker. The package's exports are unchanged (`dist/` gains `apps.js`, which is not exported), so no tag is needed.
+- **Unreleased**: `/_site/apps.json`, the listed apps as JSON for the bare GitHub Pages homepage (`/?…`, `/index.html`). Earlier: the app list (`src/apps.ts`), and compose() fills `<site-slot name="site-path">` with the site path switcher and `<site-slot name="site-apps">` with the homepage list; an unlisted app's pages are `noindex`. Pages without a slot are unchanged. Earlier: site-shell is routed at `akshayprabhakant.com/_site/*` (composed pages load `/_site/<build>/` through `ASSET_BASE`) and the exact `akshayprabhakant.com/`, where it composes the GitHub Pages homepage and fails open to Pages. Earlier: added site-shell (`shell/`, `scripts/build-shell.ts`), the theme-only composition Worker. The package's exports are unchanged (`dist/` gains `apps.js`, which is not exported), so no tag is needed.
 - **0.2.0**: removed the Slate Light (`slate-light`) and Slate Dark (`slate-dark`) themes. The catalogue is now Classic Light and Classic Dark, with System as the default. A stored slate id falls back to System (Classic Light or Classic Dark through `prefers-color-scheme`). Every export and token name is unchanged, so an app bumps with no code change.
 - **0.1.0**: first release, with Classic Light, Classic Dark, Slate Light and Slate Dark.
 

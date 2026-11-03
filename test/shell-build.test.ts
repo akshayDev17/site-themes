@@ -2,18 +2,21 @@
 // catalogue's boot, minified, and runs before first paint in a bare context.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import vm from 'node:vm';
 import { keptBuilds, parseBuilds, releasedBuilds } from '../scripts/shell-builds.js';
+import { listedAppsJson } from '../shell/nav.js';
+import { APPS } from '../src/apps.js';
 import { STORAGE_KEY } from '../src/boot.js';
 import { themeDeclarations } from '../src/css.js';
 import { BASE_THEME_ID, THEMES, THEME_IDS } from '../src/themes.js';
 
 const build = JSON.parse(readFileSync(new URL('../../shell/generated/build.json', import.meta.url), 'utf8')) as {
-  id: string; inline: string; scripts: string[];
+  id: string; inline: string; scripts: string[]; apps: { json: string; etag: string };
 };
 const boot = /<script data-site-shell>([\s\S]*?)<\/script>/.exec(build.inline)![1];
 const style = /<style data-site-shell>([\s\S]*?)<\/style>/.exec(build.inline)![1];
@@ -34,6 +37,12 @@ test('the build id is a 12-hex content hash and names the asset directory', () =
   assert.match(build.id, /^[0-9a-f]{12}$/);
   assert.deepEqual(build.scripts, ['site.js']);
   readFileSync(new URL(`../../shell/public/_site/${build.id}/site.js`, import.meta.url));
+});
+
+test('build.json carries /_site/apps.json built from src/apps.ts, with an ETag that is its content hash', () => {
+  assert.equal(build.apps.json, listedAppsJson(APPS));
+  const hash = createHash('sha256').update(build.apps.json).digest('hex').slice(0, 16);
+  assert.equal(build.apps.etag, `"${hash}"`);
 });
 
 test('the inline boot applies a stored theme, and System / unknown ids follow the OS', () => {

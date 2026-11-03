@@ -12,6 +12,9 @@
 //   <site-slot name="site-apps">
 //     the listed apps other than the homepage, for the homepage Apps cards.
 //
+// It also builds /_site/apps.json (listedAppsJson), the same list for a page
+// that compose() does not reach: GitHub Pages serves /?… and /index.html bare.
+//
 // Each slot carries its own small <style>, so a page with no slot gets nothing.
 import { APPS, HOME_ID, type App } from '../src/apps.js';
 
@@ -186,6 +189,18 @@ export function siteAppsMarkup(apps: readonly App[] = APPS): string {
     )
     .join('');
   return `<style data-site-shell>${APPS_CSS}</style><ul class="site-apps">${items}</ul>`;
+}
+
+/** One app in /_site/apps.json: what the homepage Apps cards render. */
+export type ListedApp = Pick<App, 'id' | 'label' | 'path' | 'blurb' | 'gated'>;
+
+/**
+ * The body of /_site/apps.json: every listed app (the homepage first, as
+ * "home"), in list order. Unlisted apps are left out.
+ */
+export function listedAppsJson(apps: readonly App[] = APPS): string {
+  const listed: ListedApp[] = apps.filter((a) => a.listed).map(({ id, label, path, blurb, gated }) => ({ id, label, path, blurb, gated }));
+  return JSON.stringify(listed);
 }
 
 /**

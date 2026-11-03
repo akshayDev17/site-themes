@@ -316,6 +316,42 @@ test('home (exact / route): GitHub Pages\' homepage plus the head block, byte fo
   assert.equal(js.headers.get('cache-control'), 'public, max-age=31536000, immutable');
 });
 
+test('/_site/apps.json: the listed apps from src/apps.ts, cached five minutes with an ETag', async (t) => {
+  const s = await session(t, [SHELL]);
+  const { json, etag } = build().apps;
+  const res = await fetch(`${s.base}/_site/apps.json`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'application/json; charset=utf-8');
+  assert.equal(res.headers.get('cache-control'), 'public, max-age=300');
+  assert.equal(res.headers.get('etag'), etag);
+  assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(await res.text(), json);
+  assert.deepEqual(JSON.parse(json).map((a) => a.id), ['home', 'chat', 'quiz', 'graph', 'atlas']);
+
+  for (const tag of [etag, `W/${etag}`, `"x", ${etag}`, '*']) {
+    const same = await fetch(`${s.base}/_site/apps.json`, { headers: { 'if-none-match': tag } });
+    assert.equal(same.status, 304, tag);
+    assert.equal(same.headers.get('etag'), etag, tag);
+    assert.equal(same.headers.get('cache-control'), 'public, max-age=300', tag);
+  }
+  assert.equal((await fetch(`${s.base}/_site/apps.json`, { headers: { 'if-none-match': '"stale"' } })).status, 200);
+
+  const head = await fetch(`${s.base}/_site/apps.json`, { method: 'HEAD' });
+  assert.equal(head.status, 200);
+  assert.equal(head.headers.get('etag'), etag);
+  assert.equal(await head.text(), '');
+  const post = await fetch(`${s.base}/_site/apps.json`, { method: 'POST' });
+  assert.equal(post.status, 405);
+  assert.equal(post.headers.get('allow'), 'GET, HEAD');
+
+  // Every other non-file path under /_site/ is still a 404 that is never cached.
+  for (const path of ['/_site/apps.json/', '/_site/apps', '/_site/APPS.json', `/_site/${build().id}/apps.json`]) {
+    const miss = await fetch(`${s.base}${path}`);
+    assert.equal(miss.status, 404, path);
+    assert.equal(miss.headers.get('cache-control'), 'no-store', path);
+  }
+});
+
 test('home: a compose error serves GitHub Pages\' page unchanged, fetched again', async (t) => {
   const pages = await fakePages(t);
   const s = await homeSession(t, pages, BAD_ASSET_BASE_SHELL);
