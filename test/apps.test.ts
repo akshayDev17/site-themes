@@ -9,7 +9,7 @@ test('the list is valid, in the owner-approved order, and every app starts liste
   assert.deepEqual(
     APPS.map((a) => [a.id, a.label, a.path, a.gated, a.listed]),
     [
-      ['home', 'Portfolio', '/', false, true],
+      ['home', 'Home', '/', false, true],
       ['chat', 'AI Digest', '/chat-archives', false, true],
       ['quiz', 'Quiz Room', '/quiz', true, true],
       ['graph', 'Graph Notes', '/graph/', true, true],

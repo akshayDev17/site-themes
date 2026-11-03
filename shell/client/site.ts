@@ -1,63 +1,68 @@
 // /_site/<build>/site.js: what composed pages run after parsing (deferred).
-// Registers <site-theme-picker>, which the apps place themselves, opens the
-// site path's phone sheet in browsers that cannot do it without JavaScript, and
-// holds that sheet to the screen.
+// Registers <site-theme-picker>, which the apps place themselves, and looks
+// after the site row where it scrolls (a portrait phone).
 import { defineThemePicker } from '../../src/picker.js';
 
 defineThemePicker();
 
-// The site path's sheet is a <dialog> opened and closed by invoker commands
-// (<button commandfor command="show-modal|close">) and light-dismissed by
-// closedby="any", which need no script. Where a browser has neither, do both here.
-if (!('command' in HTMLButtonElement.prototype)) {
-  document.addEventListener('click', (event) => {
-    const button = (event.target as Element | null)?.closest?.('button[commandfor]');
-    const dialog = button && document.getElementById(button.getAttribute('commandfor') ?? '');
-    if (!(dialog instanceof HTMLDialogElement)) return;
-    const command = button.getAttribute('command');
-    if (command === 'show-modal' && !dialog.open) dialog.showModal();
-    else if (command === 'close') dialog.close();
-  });
-}
-if (!('closedBy' in HTMLDialogElement.prototype)) {
-  // A click on the backdrop targets the dialog itself; its content never does.
-  document.addEventListener('click', (event) => {
-    const dialog = event.target;
-    if (dialog instanceof HTMLDialogElement && dialog.open && dialog.getAttribute('closedby') === 'any') {
-      const r = dialog.getBoundingClientRect();
-      const e = event as MouseEvent;
-      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dialog.close();
-    }
-  });
+// The site row (shell/nav.ts) is one line that scrolls sideways where it is
+// wider than its box. Two things CSS cannot do:
+// - start it scrolled so the current app is in view (unscrolled, the last app,
+//   Election Atlas, is the one cut off), centred where it would be cut off;
+// - say which edges have apps past them, as data-more="start end", which the
+//   row's CSS fades so the row reads as scrollable.
+// Apps can redraw the slot after a client-side navigation, so rows are found
+// again whenever one is added.
+const ROWS = 'site-slot[name="site-path"] .sp-apps';
+const seen = new WeakSet<Element>();
+
+function markEdges(row: HTMLElement): void {
+  const end = row.scrollWidth - row.clientWidth;
+  const more = [row.scrollLeft > 1 ? 'start' : '', row.scrollLeft < end - 1 ? 'end' : ''].filter(Boolean).join(' ');
+  if (more) row.dataset.more = more;
+  else delete row.dataset.more;
 }
 
-// The sheet's own CSS fits it to the screen while the page is not panned. A page
-// wider than a phone's screen can be panned (and any page zoomed), which moves
-// the screen, the visual viewport, within the layout viewport the fixed sheet is
-// placed in; so hold each sheet to the visual viewport: its left edge and width,
-// its bottom on the screen's bottom, and at most 85% of the screen's height.
-function holdSheetsToScreen(): void {
-  const vv = window.visualViewport;
-  if (!vv) return;
-  for (const sheet of document.querySelectorAll<HTMLDialogElement>('dialog.sp-sheet')) {
-    const s = sheet.style;
-    s.left = `${vv.offsetLeft}px`;
-    s.width = `${vv.width}px`;
-    s.top = `${vv.offsetTop + vv.height}px`;
-    s.bottom = 'auto';
-    s.transform = 'translateY(-100%)';
-    s.maxHeight = `${vv.height * 0.85}px`;
+function showCurrent(row: HTMLElement): void {
+  const current = row.querySelector<HTMLElement>('[aria-current]');
+  if (!current || row.scrollWidth <= row.clientWidth) return;
+  const box = row.getBoundingClientRect();
+  const item = current.getBoundingClientRect();
+  const fade = 32;
+  if (item.left >= box.left + fade && item.right <= box.right - fade) return;
+  const left = item.left - box.left + row.scrollLeft;
+  row.scrollLeft = Math.max(0, left - (row.clientWidth - item.width) / 2);
+}
+
+/** Marks every row's edges; a row seen for the first time (or every row, with `recentre`) also shows its current app. */
+function syncRows(recentre = false): void {
+  for (const row of document.querySelectorAll<HTMLElement>(ROWS)) {
+    if (!seen.has(row)) {
+      seen.add(row);
+      showCurrent(row);
+      row.addEventListener('scroll', () => markEdges(row), { passive: true });
+    } else if (recentre) showCurrent(row);
+    markEdges(row);
   }
 }
-let holdQueued = false;
-const queueHold = () => {
-  if (holdQueued) return;
-  holdQueued = true;
+
+let queued = false;
+const queueSync = () => {
+  if (queued) return;
+  queued = true;
   requestAnimationFrame(() => {
-    holdQueued = false;
-    holdSheetsToScreen();
+    queued = false;
+    syncRows();
   });
 };
-holdSheetsToScreen();
-window.visualViewport?.addEventListener('resize', queueHold);
-window.visualViewport?.addEventListener('scroll', queueHold);
+
+syncRows();
+window.addEventListener('resize', queueSync);
+// The row's width changes once its web font loads.
+document.fonts?.ready.then(() => syncRows(true), () => {});
+new MutationObserver((records) => {
+  const added = records.some((r) =>
+    [...r.addedNodes].some((n) => n instanceof Element && (n.matches('site-slot, .sp-apps, .sp') || n.querySelector('.sp-apps'))),
+  );
+  if (added) queueSync();
+}).observe(document.documentElement, { childList: true, subtree: true });

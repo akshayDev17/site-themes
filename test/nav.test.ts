@@ -4,21 +4,19 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { JSDOM } from 'jsdom';
 import { APPS, type App } from '../src/apps.js';
-import { SHEET_ID, isUnlisted, listedAppsJson, parseTail, siteAppsMarkup, sitePathMarkup, slotMarkup, type Crumb } from '../shell/nav.js';
+import { GATED_TEXT, isUnlisted, listedAppsJson, parseTail, siteAppsMarkup, sitePathMarkup, slotMarkup, trailOf, type Crumb } from '../shell/nav.js';
 
-const GATED = '(invite-only, sign-in required)';
+const GATED = GATED_TEXT.trim();
 
 function render(html: string | null) {
   assert.ok(html, 'markup rendered');
   const doc = new JSDOM(`<!doctype html><body>${html}</body>`).window.document;
-  const nav = doc.querySelector('nav')!;
   return {
     doc,
-    nav,
-    row: [...doc.querySelectorAll('.sp-apps > li > *')],
-    pill: doc.querySelector('.sp-pill')!,
-    sheet: doc.querySelector('dialog')!,
-    sheetRows: [...doc.querySelectorAll('dialog li a')],
+    nav: doc.querySelector('nav.sp')!,
+    row: [...doc.querySelectorAll('nav.sp > ul.sp-apps > li > a')],
+    trail: doc.querySelector('nav.sp-trail'),
+    crumbs: [...doc.querySelectorAll('nav.sp-trail > ol > li')],
     css: [...doc.querySelector('style')!.sheet!.cssRules],
   };
 }
@@ -36,109 +34,106 @@ function accessibleName(el: Element): string {
 }
 
 /** The text shown on screen: everything but the visually hidden parts. */
-const visibleText = (el: Element) =>
-  [...el.childNodes].filter((n) => !(n.nodeType === 1 && (n as Element).classList.contains('site-vh'))).map((n) => n.textContent).join('').trim();
+const visibleText = (el: Element): string =>
+  [...el.childNodes]
+    .map((n) => (n.nodeType === 3 ? n.textContent : n.nodeType === 1 && !(n as Element).classList.contains('site-vh') ? visibleText(n as Element) : ''))
+    .join('')
+    .trim();
 
 const unlisted = (id: string): App[] => APPS.map((a) => (a.id === id ? { ...a, listed: false } : a));
+const app = (id: string) => APPS.find((a) => a.id === id)!;
+const STATE_TAIL: Crumb[] = [{ label: 'India', href: '/elections/india/' }, { label: 'Uttar Pradesh' }];
 
-test('the site path is a labelled nav: the site name goes home, then the five apps inline, in list order', () => {
-  const { nav, row } = render(sitePathMarkup('atlas'));
-  assert.equal(nav.getAttribute('aria-label'), 'Site path');
-  const home = [...nav.querySelectorAll(':scope > a')];
-  assert.deepEqual(home.map((a) => a.getAttribute('href')), ['/', '/']);
-  assert.deepEqual(row.map((el) => visibleText(el).replace(/\s+/g, ' ')), ['Portfolio', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas']);
-  assert.deepEqual(row.map((el) => el.getAttribute('href')), ['/', '/chat-archives', '/quiz', '/graph/', null]);
+test('the site row is just the five apps, in list order, each a link to its root: no site name, no "Portfolio" crumb', () => {
+  const { doc, nav, row } = render(sitePathMarkup('atlas'));
+  assert.equal(nav.getAttribute('aria-label'), 'Site');
+  assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas']);
+  assert.deepEqual(row.map((a) => a.getAttribute('href')), ['/', '/chat-archives', '/quiz', '/graph/', '/elections/india/']);
+  assert.equal(nav.children.length, 1, 'the row is the only thing in the site nav');
+  const shown = [...doc.querySelectorAll('nav')].map((n) => n.textContent).join('');
+  assert.ok(!shown.includes('akshayprabhakant.com'), 'no site name');
+  assert.ok(!shown.includes('Portfolio'));
+  assert.ok(!shown.includes('/'), 'no "/" separators');
 });
 
-test('the home link has a proper accessible name at both widths, starting with what it shows', () => {
-  const { nav } = render(sitePathMarkup('chat'));
-  const long = nav.querySelector('.sp-long')!;
-  const short = nav.querySelector('.sp-short')!;
-  assert.equal(accessibleName(long), 'akshayprabhakant.com home');
-  assert.equal(accessibleName(short), 'AP, akshayprabhakant.com home');
-  // WCAG 2.5.3 Label in Name: the name starts with the visible label.
-  assert.ok(accessibleName(long).startsWith(visibleText(long)));
-  assert.ok(accessibleName(short).startsWith(short.textContent!));
-});
-
-test('at the app root, the current app is plain text with aria-current="page"', () => {
-  const { nav, row } = render(sitePathMarkup('atlas'));
-  const here = row[4];
-  assert.equal(here.tagName, 'SPAN');
-  assert.equal(here.getAttribute('aria-current'), 'page');
-  assert.equal(nav.querySelectorAll('[aria-current="page"]').length, 1);
-  for (const el of row.slice(0, 4)) assert.equal(el.getAttribute('aria-current'), null);
-});
-
-test('deeper in the app, the app links to its root and the last crumb is the current page as plain text', () => {
-  const tail: Crumb[] = [
-    { label: 'India', href: '/elections/india/' },
-    { label: 'Uttar Pradesh', href: '/elections/india/state/?s=IN-UP' },
-  ];
-  const { nav, row } = render(sitePathMarkup('atlas', tail));
-  const app = row[4];
-  assert.equal(app.tagName, 'A');
-  assert.equal(app.getAttribute('href'), '/elections/india/');
-  assert.equal(app.getAttribute('aria-current'), 'true');
-  const crumbs = [...nav.querySelectorAll('.sp-crumb')];
-  assert.equal(crumbs.length, 2);
-  assert.equal(crumbs[0].querySelector('a')!.getAttribute('href'), '/elections/india/');
-  const last = crumbs[1].querySelector('[aria-current]')!;
-  assert.equal(last.tagName, 'SPAN', 'the current page is not a link');
-  assert.equal(last.getAttribute('aria-current'), 'page');
-  assert.equal(last.textContent, 'Uttar Pradesh');
-  assert.equal(nav.querySelectorAll('[aria-current="page"]').length, 1, 'aria-current="page" only on the true current page');
-  for (const sep of nav.querySelectorAll('.sp-sep')) assert.equal(sep.getAttribute('aria-hidden'), 'true');
-});
-
-test('gated apps carry an aria-hidden lock and the text alternative', () => {
-  const { row, sheetRows } = render(sitePathMarkup('home'));
-  for (const el of [row[2], row[3], sheetRows[2], sheetRows[3]]) {
-    assert.ok(accessibleName(el).includes(GATED), accessibleName(el));
-    assert.equal(el.querySelector('svg')!.getAttribute('aria-hidden'), 'true');
+test('no lock anywhere: gated apps carry only a visually hidden "(sign-in required)"', () => {
+  for (const html of [sitePathMarkup('home'), sitePathMarkup('quiz', [{ label: 'History' }]), siteAppsMarkup()]) {
+    const doc = new JSDOM(`<!doctype html><body>${html}</body>`).window.document;
+    assert.equal(doc.querySelectorAll('svg, .site-lock').length, 0, 'no lock glyph');
+    assert.ok(!/site-lock|<svg|🔒/.test(html!), 'no lock in the markup or its CSS');
+    for (const vh of doc.querySelectorAll('.site-vh')) {
+      if (vh.textContent!.includes('sign-in')) assert.equal(vh.textContent, ' (sign-in required)');
+    }
   }
-  for (const el of [row[1], row[4]]) assert.ok(!accessibleName(el).includes(GATED));
+  const { row } = render(sitePathMarkup('home'));
+  assert.deepEqual(row.map(accessibleName), ['Home', 'AI Digest', `Quiz Room ${GATED}`, `Graph Notes ${GATED}`, 'Election Atlas']);
+  assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas'], 'nothing extra is drawn');
+  // WCAG 2.5.3 Label in Name: the name starts with the visible label.
+  for (const a of row) assert.ok(accessibleName(a).startsWith(visibleText(a)));
 });
 
-test('the phone pill names the current app, hides its chevron, and opens the sheet as a modal dialog', () => {
-  const { pill, sheet } = render(sitePathMarkup('atlas'));
-  assert.equal(pill.tagName, 'BUTTON');
-  assert.equal(pill.getAttribute('type'), 'button');
-  assert.equal(accessibleName(pill), 'Election Atlas, switch app');
-  assert.equal(pill.querySelector('.sp-chev')!.getAttribute('aria-hidden'), 'true');
-  assert.equal(pill.getAttribute('aria-haspopup'), 'dialog');
-  assert.equal(pill.getAttribute('commandfor'), SHEET_ID);
-  assert.equal(pill.getAttribute('command'), 'show-modal');
-  assert.equal(sheet.id, SHEET_ID);
-  assert.equal(sheet.getAttribute('aria-label'), 'Apps on akshayprabhakant.com');
-  assert.equal(sheet.getAttribute('closedby'), 'any');
-  const close = sheet.querySelector('button.sp-close')!;
-  assert.equal(close.textContent, 'Close', 'a visible Close button');
-  assert.equal(close.getAttribute('commandfor'), SHEET_ID);
-  assert.equal(close.getAttribute('command'), 'close');
+test('at the app root, the current app is marked aria-current="page" and there is no trail', () => {
+  const { doc, row, trail } = render(sitePathMarkup('atlas'));
+  assert.equal(row[4].getAttribute('aria-current'), 'page');
+  assert.equal(row[4].querySelector('.sp-label')!.textContent, 'Election Atlas');
+  for (const el of row.slice(0, 4)) assert.equal(el.getAttribute('aria-current'), null);
+  assert.equal(trail, null);
+  assert.equal(doc.querySelectorAll('[aria-current="page"]').length, 1);
 });
 
-test('the sheet lists the apps with their blurbs and marks the current one "You are here"', () => {
-  const { sheetRows } = render(sitePathMarkup('atlas'));
-  assert.deepEqual(sheetRows.map((a) => a.querySelector('.sp-blurb')!.textContent), APPS.map((a) => a.blurb));
-  const here = sheetRows.filter((a) => a.hasAttribute('aria-current'));
-  assert.equal(here.length, 1);
-  assert.equal(here[0].getAttribute('href'), '/elections/india/');
-  assert.equal(here[0].getAttribute('aria-current'), 'page');
-  assert.equal(here[0].querySelector('.sp-here-tag')!.textContent, 'You are here');
-  // Deeper in the app the row still links to the app's root, as the current location rather than the page.
-  const deep = render(sitePathMarkup('atlas', [{ label: 'India' }])).sheetRows[4];
-  assert.equal(deep.getAttribute('aria-current'), 'true');
-});
-
-test('on the homepage the switcher reads "Portfolio"', () => {
-  const { row, pill } = render(sitePathMarkup('home'));
-  assert.equal(row[0].textContent, 'Portfolio');
+test('on the homepage the row reads "Home", marked as the current page', () => {
+  const { row } = render(sitePathMarkup('home'));
+  assert.equal(visibleText(row[0]), 'Home');
+  assert.equal(row[0].getAttribute('href'), '/');
   assert.equal(row[0].getAttribute('aria-current'), 'page');
-  assert.equal(accessibleName(pill), 'Portfolio, switch app');
 });
 
-test('listed:false: the app says "Not listed" on its own switcher and is absent from every other one', () => {
+test('deeper in an app, the page name goes on its own line under the row, never into it', () => {
+  const { doc, nav, row, trail, crumbs } = render(sitePathMarkup('quiz', [{ label: 'History' }]));
+  assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas'], 'the row is unchanged');
+  assert.ok(!nav.textContent!.includes('History'), 'the page name is not in the row');
+  assert.equal(row[2].getAttribute('aria-current'), 'true', 'the app is the current location, not the page');
+  assert.ok(trail, 'a trail');
+  assert.equal(nav.nextElementSibling, trail, 'the trail is a sibling after the row, not inside it');
+  assert.equal(trail.getAttribute('aria-label'), 'Breadcrumb');
+  assert.deepEqual(crumbs.map((li) => li.textContent), ['Quiz Room', 'History']);
+  assert.equal(crumbs[0].querySelector('a')!.getAttribute('href'), '/quiz');
+  const here = crumbs[1].firstElementChild!;
+  assert.equal(here.tagName, 'SPAN', 'the current page is not a link');
+  assert.equal(here.getAttribute('aria-current'), 'page');
+  assert.equal(doc.querySelectorAll('[aria-current="page"]').length, 1, 'aria-current="page" only on the true current page');
+});
+
+test('the atlas trail starts at its own root crumb: "India › Uttar Pradesh"', () => {
+  const { row, crumbs } = render(sitePathMarkup('atlas', STATE_TAIL));
+  assert.equal(row[4].getAttribute('aria-current'), 'true');
+  assert.deepEqual(crumbs.map((li) => li.textContent), ['India', 'Uttar Pradesh']);
+  assert.equal(crumbs[0].querySelector('a')!.getAttribute('href'), '/elections/india/');
+  const seat = render(sitePathMarkup('atlas', [STATE_TAIL[0], { label: 'Uttar Pradesh', href: '/elections/india/state/?s=IN-UP' }, { label: 'Gorakhpur' }]));
+  assert.deepEqual(seat.crumbs.map((li) => li.textContent), ['India', 'Uttar Pradesh', 'Gorakhpur']);
+  assert.deepEqual(seat.crumbs.map((li) => li.querySelector('a')?.getAttribute('href') ?? null), ['/elections/india/', '/elections/india/state/?s=IN-UP', null]);
+});
+
+test('trailOf: led by the app unless the first crumb links to its root; nothing at the root or for a lone crumb', () => {
+  assert.deepEqual(trailOf(app('quiz'), []), []);
+  assert.deepEqual(trailOf(app('quiz'), [{ label: 'History' }]), [{ label: 'Quiz Room', href: '/quiz' }, { label: 'History' }]);
+  assert.deepEqual(trailOf(app('atlas'), STATE_TAIL), STATE_TAIL);
+  assert.deepEqual(trailOf(app('atlas'), [{ label: 'India', href: '/elections/india/' }]), [], 'a lone crumb says nothing the row does not');
+  // A crumb with no link between the first and the last stays plain text.
+  const { crumbs } = render(sitePathMarkup('chat', [{ label: 'Archive' }, { label: 'Front page' }]));
+  assert.deepEqual(crumbs.map((li) => li.firstElementChild!.tagName), ['A', 'SPAN', 'SPAN']);
+  assert.equal(crumbs[1].firstElementChild!.getAttribute('aria-current'), null);
+});
+
+test('the "›" between crumbs is drawn by CSS, so the trail reads as a plain list', () => {
+  const { trail, css } = render(sitePathMarkup('quiz', [{ label: 'History' }]));
+  assert.ok(!trail!.textContent!.includes('›'));
+  const sep = css.find((r): r is CSSStyleRule => 'selectorText' in r && (r as CSSStyleRule).selectorText === '.sp-trail li+li::before');
+  assert.ok(sep);
+  assert.equal(sep.style.getPropertyValue('content'), '"\\203A"');
+});
+
+test('listed:false: the app says "Not listed" on its own row and is absent from every other one', () => {
   const apps = unlisted('graph');
   assert.equal(isUnlisted('graph', apps), true);
   assert.equal(isUnlisted('graph'), false);
@@ -148,12 +143,10 @@ test('listed:false: the app says "Not listed" on its own switcher and is absent 
   assert.equal(own.row.length, 5);
   assert.equal(accessibleName(own.row[3]), `Graph Notes ${GATED}, Not listed`);
   assert.equal(own.row[3].getAttribute('aria-current'), 'page');
-  assert.equal(own.sheetRows[3].querySelector('.sp-here-tag')!.textContent, 'You are here · Not listed');
 
   for (const id of ['home', 'chat', 'quiz', 'atlas']) {
     const other = render(sitePathMarkup(id, [], apps));
     assert.equal(other.row.length, 4, id);
-    assert.equal(other.sheetRows.length, 4, id);
     assert.equal(other.doc.querySelector('[href="/graph/"]'), null, id);
     assert.ok(!other.doc.body.textContent!.includes('Graph Notes'), id);
     assert.ok(!other.doc.body.textContent!.includes('Not listed'), id);
@@ -171,55 +164,44 @@ test('/_site/apps.json: every listed app in list order, with exactly what the Ap
   assert.deepEqual(JSON.parse(listedAppsJson()).map((a: App) => a.id), ['home', 'chat', 'quiz', 'graph', 'atlas']);
 });
 
-test('the slot styles: Newsreader at 15 px in sentence case, 44 px targets, the folds at 900 and 640 px', () => {
-  const { css } = render(sitePathMarkup('atlas'));
+test('the slot styles: Newsreader in sentence case, 44 px row targets, one line that scrolls rather than wraps', () => {
+  const { css } = render(sitePathMarkup('atlas', STATE_TAIL));
   const styleRules = (rules: CSSRule[]) => rules.filter((r): r is CSSStyleRule => 'selectorText' in r);
-  const rule = (rules: CSSRule[], selector: string) => {
-    const found = styleRules(rules).find((r) => r.selectorText === selector);
+  const rule = (selector: string) => {
+    const found = styleRules(css).find((r) => r.selectorText === selector);
     assert.ok(found, selector);
     return found.style;
   };
-  const media = (query: string) => {
-    const found = css.find((r): r is CSSMediaRule => 'media' in r && (r as CSSMediaRule).media.mediaText === query);
-    assert.ok(found, query);
-    return [...found.cssRules];
-  };
-  const declarations = [css, ...css.filter((r): r is CSSMediaRule => 'media' in r).map((r) => [...r.cssRules])]
-    .flatMap(styleRules)
-    .flatMap((r) => Array.from({ length: r.style.length }, (_, i) => r.style.getPropertyValue(r.style[i])));
+  const declarations = styleRules(css).flatMap((r) => Array.from({ length: r.style.length }, (_, i) => r.style.getPropertyValue(r.style[i])));
 
-  const sp = rule(css, '.sp');
+  const sp = rule('.sp');
   assert.equal(sp.getPropertyValue('font'), '400 15px/1.3 var(--font-serif,Georgia,serif)');
   assert.equal(sp.getPropertyValue('text-transform'), 'none');
+  assert.equal(rule('.sp-trail').getPropertyValue('font'), '400 14px/1.3 var(--font-serif,Georgia,serif)');
   assert.ok(!declarations.some((v) => /font-mono|uppercase/.test(v)), 'no mono or uppercase anywhere');
 
-  const target = rule(css, '.sp a,.sp-here');
+  const target = rule('.sp a');
   assert.equal(target.getPropertyValue('min-height'), '44px');
   assert.equal(target.getPropertyValue('min-width'), '44px');
-  // The pill: drawn 34 px tall (1 px borders included); its ::before sits on the 32 px padding box, so it is tapped over 32 + 2 × 6 = 44 px.
-  const pill = rule(css, '.sp-pill');
-  assert.equal(pill.getPropertyValue('position'), 'relative');
-  assert.equal(pill.getPropertyValue('box-sizing'), 'border-box');
-  assert.equal(pill.getPropertyValue('min-height'), '34px');
-  const tap = rule(css, '.sp-pill::before');
-  assert.equal(tap.getPropertyValue('content'), '""');
-  assert.equal(tap.getPropertyValue('position'), 'absolute');
-  assert.equal(tap.getPropertyValue('inset'), '-6px -1px');
-  assert.equal(rule(css, '.sp-close').getPropertyValue('min-height'), '44px');
+  assert.equal(target.getPropertyValue('white-space'), 'nowrap');
+  assert.equal(rule('.sp-trail a').getPropertyValue('min-height'), '32px');
 
-  const at900 = media('(max-width:900px)');
-  assert.deepEqual([rule(at900, '.sp-long').getPropertyValue('display'), rule(at900, '.sp-long').getPropertyPriority('display')], ['none', 'important']);
-  assert.deepEqual([rule(at900, '.sp-short').getPropertyValue('display'), rule(at900, '.sp-short').getPropertyPriority('display')], ['inline-flex', 'important']);
-  const at640 = media('(max-width:640px)');
-  assert.deepEqual([rule(at640, '.sp-apps').getPropertyValue('display'), rule(at640, '.sp-apps').getPropertyPriority('display')], ['none', 'important']);
-  assert.equal(rule(at640, '.sp-pill').getPropertyValue('display'), 'inline-flex');
-  assert.equal(rule(at640, '.sp-crumb:not(:last-child)').getPropertyValue('display'), 'none');
+  const row = rule('.sp-apps');
+  assert.equal(row.getPropertyValue('flex-wrap'), 'nowrap');
+  assert.equal(row.getPropertyValue('overflow-x'), 'auto');
+  assert.equal(row.getPropertyValue('scrollbar-width'), 'none');
+  assert.equal(rule('.sp-apps[data-more~="end"]').getPropertyValue('--sp-fade-e'), '2rem');
+  assert.equal(rule('.sp-apps[data-more~="start"]').getPropertyValue('--sp-fade-s'), '2rem');
+  assert.match(rule('.sp-apps[data-more]').getPropertyValue('mask-image'), /^linear-gradient\(to right,transparent/);
+  assert.equal(rule('.sp a:focus-visible').getPropertyValue('outline-offset'), '-2px', 'the ring is drawn inside the scrolling row');
+  assert.equal(css.filter((r) => 'media' in r).length, 0, 'no breakpoints: the row is the same everywhere, it just scrolls when it must');
 
-  assert.equal(rule(css, '.sp .sp-app[aria-current]').getPropertyValue('color'), 'var(--text)');
+  assert.equal(rule('.sp .sp-app[aria-current]').getPropertyValue('color'), 'var(--text)');
+  assert.equal(rule('.sp .sp-app[aria-current] .sp-label').getPropertyValue('text-decoration'), 'underline 2px');
   assert.ok(!declarations.some((v) => v.includes('var(--accent)')), 'the current app is marked in ink, never accent');
 });
 
-test('the homepage list: the listed apps other than Portfolio, gated ones marked', () => {
+test('the homepage list: the listed apps other than Home, gated ones marked for screen readers only', () => {
   const doc = new JSDOM(siteAppsMarkup()).window.document;
   const items = [...doc.querySelectorAll('ul.site-apps > li')];
   assert.deepEqual(items.map((li) => li.getAttribute('data-app')), ['chat', 'quiz', 'graph', 'atlas']);
@@ -241,10 +223,10 @@ test('the tail: escaped text, same-site links only, and anything malformed throw
   for (const raw of bad) assert.throws(() => parseTail(raw), Error, raw);
 
   const evil = '<img src=x onerror=alert(1)>"\'&';
-  const { doc, nav } = render(sitePathMarkup('chat', [{ label: evil, href: '/chat-archives/?q="x"' }, { label: evil }]));
+  const { doc, trail } = render(sitePathMarkup('chat', [{ label: evil, href: '/chat-archives/?q="x"' }, { label: evil }]));
   assert.equal(doc.querySelector('img'), null);
-  assert.equal(nav.querySelector('.sp-crumb a')!.getAttribute('href'), '/chat-archives/?q="x"');
-  assert.equal(nav.querySelector('.sp-crumb [aria-current]')!.textContent, evil);
+  assert.equal(trail!.querySelectorAll('a')[1].getAttribute('href'), '/chat-archives/?q="x"');
+  assert.equal(trail!.querySelector('[aria-current]')!.textContent, evil);
 });
 
 test('slotMarkup: site-path reads data-tail, site-apps renders the list, anything else (or an unknown app) is left alone', () => {

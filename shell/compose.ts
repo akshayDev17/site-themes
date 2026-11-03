@@ -86,7 +86,7 @@ export function composeResponse(res: Response, opts: ComposeOptions, build: Buil
     else el.before(markup, { html: true });
   };
 
-  // Each slot name is filled once per page (the site path's sheet has a fixed id).
+  // Each slot name is filled once per page.
   const filled = new Set<string>();
   const fillSlot = (el: Element) => {
     const attr = (attrName: string) => decodeAttr(el.getAttribute(attrName));

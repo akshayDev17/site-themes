@@ -3,12 +3,12 @@
 // well as in the Worker.
 //
 //   <site-slot name="site-path" data-tail='[{"label":"India","href":"/elections/india/"}]'>
-//     the site path: akshayprabhakant.com / <the apps> / <the app's own crumbs>.
-//     The apps sit inline wherever there is room. On a narrow (portrait phone)
-//     screen they fold into the current app's name, a button that opens a
-//     bottom sheet (a modal <dialog> opened by an invoker command, so it needs
-//     no JavaScript where the browser supports commands; site.js covers the
-//     rest).
+//     the site row, "Home  AI Digest  Quiz Room  Graph Notes  Election Atlas", with
+//     the current app marked, and under it, on its own line, the page's trail
+//     (a breadcrumb such as "India › Uttar Pradesh") drawn from data-tail. The
+//     row sits inline wherever it fits; where it does not (a portrait phone) it
+//     scrolls sideways as one line, and site.js scrolls the current app into view
+//     and fades the edge that has more apps past it.
 //   <site-slot name="site-apps">
 //     the listed apps other than the homepage, for the homepage Apps cards.
 //
@@ -24,10 +24,8 @@ export interface Crumb {
   href?: string;
 }
 
-/** The dialog the phone pill opens; one site path per page. */
-export const SHEET_ID = 'site-path-sheet';
-const SITE = 'akshayprabhakant.com';
-const GATED_TEXT = ' (invite-only, sign-in required)';
+/** What a screen reader hears after a gated app's name. Nothing is drawn for it. */
+export const GATED_TEXT = ' (sign-in required)';
 // A same-origin path: one leading '/', never '//' or '/\' (both leave the origin), no whitespace.
 const LOCAL_PATH = /^\/(?![/\\])[^\s\\]*$/;
 
@@ -53,129 +51,99 @@ export function parseTail(raw: string | null): Crumb[] {
   });
 }
 
-const LOCK =
-  '<svg class="site-lock" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false">' +
-  '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 const VH = (text: string) => `<span class="site-vh">${escapeHtml(text)}</span>`;
-const lock = (app: App) => (app.gated ? LOCK + VH(GATED_TEXT) : '');
+const gatedNote = (app: App) => (app.gated ? VH(GATED_TEXT) : '');
 const notListed = (app: App) => (app.listed ? '' : `<span class="sp-tag">${VH(', ')}Not listed</span>`);
 
 const VH_CSS = '.site-vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}';
-const LOCK_CSS = '.site-lock{fill:none;stroke:currentColor;stroke-width:2;margin-left:.25em;flex:none}';
 
-// Newsreader, sentence case, 15 px; every target at least 44 px (the path's
-// left padding is pulled back so its text lines up with the masthead); the current
-// app in ink (not accent), underlined; the tail's current page plain ink text.
-// At 900 px and below the site name is "AP"; at 640 px and below the apps fold into
-// the pill and only the last crumb of the tail shows.
+// The row: Newsreader, sentence case, 15 px, muted; the current app in ink (not
+// accent) with a 2 px underline; every target at least 44 px, and the row's left
+// edge pulled back by a link's padding so its text lines up with the page. It is
+// one line that never wraps: where it is wider than its box it scrolls sideways
+// (no scrollbar drawn), and site.js sets data-more="start end" on the side(s)
+// with apps past the edge, which fade out. Its focus ring is drawn inside the
+// link, since a scrolling box clips anything drawn outside it.
+// The trail: its own line under the row, 14 px, "›" between crumbs (drawn by
+// CSS, so screen readers hear a plain list), links underlined in a hairline, the
+// current page plain ink text, 32 px targets.
+const FADE = 'linear-gradient(to right,transparent,#000 var(--sp-fade-s,0px),#000 calc(100% - var(--sp-fade-e,0px)),transparent)';
 const PATH_CSS = [
-  'site-slot[name="site-path"]{display:block}',
-  '.sp{display:flex;flex-wrap:wrap;align-items:center;margin:0 0 0 -.4rem;padding:0;font:400 15px/1.3 var(--font-serif,Georgia,serif);letter-spacing:normal;text-transform:none;color:var(--text-muted)}',
-  '.sp ul{display:flex;flex-wrap:wrap;align-items:center;margin:0;padding:0;list-style:none}',
-  '.sp a,.sp-here{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;min-width:44px;padding:0 .4rem;color:inherit;text-decoration:none}',
-  '.sp a:hover{color:var(--text);text-decoration:underline;text-underline-offset:.25em}',
-  '.sp .sp-app[aria-current]{color:var(--text)}',
+  'site-slot[name="site-path"]{display:block;min-width:0}',
+  '.sp{box-sizing:border-box;min-width:0;max-width:calc(100% + .5rem);margin:0 0 0 -.5rem;padding:0;font:400 15px/1.3 var(--font-serif,Georgia,serif);letter-spacing:normal;text-transform:none;color:var(--text-muted)}',
+  // 100vw - 1rem caps the row on a page whose boxes are sized by their content, which would otherwise grow to fit it.
+  '.sp-apps{display:flex;flex-wrap:nowrap;align-items:center;gap:0 .25rem;box-sizing:border-box;max-width:min(100%,100vw - 1rem);margin:0;padding:0;list-style:none;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none}',
+  '.sp-apps::-webkit-scrollbar{display:none}',
+  '.sp-apps li{flex:none}',
+  `.sp-apps[data-more]{-webkit-mask-image:${FADE};mask-image:${FADE}}`,
+  '.sp-apps[data-more~="start"]{--sp-fade-s:2rem}',
+  '.sp-apps[data-more~="end"]{--sp-fade-e:2rem}',
+  '.sp a{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;min-width:44px;padding:0 .5rem;color:inherit;text-decoration:none;white-space:nowrap}',
+  '.sp a:hover{color:var(--text);text-decoration:underline 1px;text-underline-offset:.35em}',
+  '.sp .sp-app[aria-current]{color:var(--text);text-decoration:none}',
   '.sp .sp-app[aria-current] .sp-label{text-decoration:underline 2px;text-underline-offset:.35em}',
-  '.sp .sp-page{color:var(--text)}',
-  '.sp-sep{padding:0 .1rem;color:var(--text-muted)}',
-  '.sp-tag{margin-left:.4em;font-size:13px;color:var(--text-muted);text-decoration:none}',
-  // The pill is drawn 34 px tall; its ::before makes the tap area 44 px.
-  '.sp-pill{display:none;position:relative;align-items:center;gap:.3em;box-sizing:border-box;min-height:34px;margin:0 .2rem;padding:0 .8rem;border:1px solid var(--card-line);border-radius:999px;background:var(--card);color:var(--text);font:inherit;cursor:pointer}',
-  '.sp-pill::before{content:"";position:absolute;inset:-6px -1px}',
-  '.sp-chev{font-size:.8em}',
-  '.sp a:focus-visible,.sp-pill:focus-visible,.sp-sheet a:focus-visible,.sp-close:focus-visible{outline:2px solid var(--focus);outline-offset:2px}',
-  '.sp-short{display:none!important}',
-  '@media (max-width:900px){.sp-long{display:none!important}.sp-short{display:inline-flex!important;justify-content:flex-start}}',
-  '@media (max-width:640px){.sp-apps{display:none!important}.sp-pill{display:inline-flex}.sp-crumb:not(:last-child){display:none}}',
-  // The sheet is held to the screen (the visual viewport), not the layout viewport:
-  // on a phone, a page wider than the screen grows the layout viewport past the
-  // screen in both directions, and a sheet pinned to it (inset 0, width 100%) runs
-  // off the screen's right edge and below its bottom, Close and all. 100vw and
-  // 100dvh stay the screen's size, so this rule fits the sheet to the screen while
-  // the page is not panned (min() and max() keep a desktop scrollbar out of it);
-  // site.js then follows the visual viewport as it pans and zooms.
-  '.sp-sheet{position:fixed;inset:auto auto max(0px,100% - 100dvh) 0;box-sizing:border-box;width:min(100%,100vw);max-width:none;max-height:85dvh;margin:0;padding:.5rem 1rem calc(1rem + env(safe-area-inset-bottom,0px));overflow:auto;border:1px solid var(--card-line);border-bottom:0;border-radius:16px 16px 0 0;background:var(--card);color:var(--text);box-shadow:var(--shadow-hover);font:400 15px/1.3 var(--font-serif,Georgia,serif)}',
-  '.sp-sheet::backdrop{background:rgb(0 0 0/.4)}',
-  // The head wraps when the screen is too narrow for the site name and even a 44 px
-  // Close side by side (pinch-zoomed in, say), Close keeping to the inline end, so it
-  // stays on the screen. Close's 44 px basis, growing to its natural width, keeps the
-  // head on one line wherever it fitted before.
-  '.sp-sheet-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.25rem 1rem;padding-bottom:.25rem}',
-  '.sp-sheet-head a{display:inline-flex;align-items:center;min-height:44px;color:var(--text-muted);text-decoration:none}',
-  '.sp-close{flex:1 0 44px;max-width:max-content;margin-inline-start:auto;min-height:44px;min-width:44px;padding:0 1rem;border:1px solid var(--card-line);border-radius:999px;background:var(--card);color:var(--text);font:inherit;cursor:pointer}',
-  '.sp-sheet ul{margin:0;padding:0;list-style:none}',
-  '.sp-sheet li a{display:grid;grid-template-columns:1fr auto;align-items:center;align-content:center;column-gap:1rem;row-gap:.1rem;min-height:58px;padding:.5rem .75rem;border-radius:var(--radius-card,.7rem);color:var(--text);text-decoration:none}',
-  '.sp-sheet li a[aria-current]{background:var(--surface-2)}',
-  '.sp-name{display:inline-flex;align-items:center}',
-  '.sp-blurb{grid-column:1;font-size:13px;color:var(--text-muted)}',
-  '.sp-here-tag{grid-column:2;grid-row:1/span 2;font-size:13px;color:var(--text-muted)}',
+  '.sp-tag{margin-left:.4em;font-size:13px;color:var(--text-muted)}',
+  '.sp a:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}',
+  '.sp-trail{margin:.25rem 0 0;padding:0;font:400 14px/1.3 var(--font-serif,Georgia,serif);letter-spacing:normal;text-transform:none;color:var(--text-muted)}',
+  '.sp-trail ol{display:flex;flex-wrap:wrap;align-items:center;margin:0;padding:0;list-style:none}',
+  '.sp-trail li{display:inline-flex;align-items:center;min-width:0}',
+  '.sp-trail li+li::before{content:"\\203A";padding:0 .45rem;color:var(--text-muted)}',
+  '.sp-trail a{display:inline-flex;align-items:center;min-height:32px;color:inherit;text-decoration:underline 1px;text-decoration-color:var(--line-strong);text-underline-offset:.3em}',
+  '.sp-trail a:hover{color:var(--text);text-decoration-color:currentColor}',
+  '.sp-trail a:focus-visible{outline:2px solid var(--focus);outline-offset:2px}',
+  '.sp-trail [aria-current]{color:var(--text)}',
   VH_CSS,
-  LOCK_CSS,
 ].join('');
 
-/** One app in the inline row: the current app is marked, a link when the page is deeper in the app. */
+/** One app in the row: always a link to the app's root; the current app is marked. */
 function rowItem(app: App, current: boolean, atAppRoot: boolean): string {
-  const text = escapeHtml(app.label) + lock(app);
-  if (!current) return `<li><a href="${escapeHtml(app.path)}">${text}</a></li>`;
-  const label = `<span class="sp-label">${escapeHtml(app.label)}</span>${lock(app)}`;
-  if (atAppRoot) return `<li><span class="sp-here sp-app" aria-current="page">${label}${notListed(app)}</span></li>`;
-  return `<li><a class="sp-app" href="${escapeHtml(app.path)}" aria-current="true">${label}${notListed(app)}</a></li>`;
-}
-
-/** One row in the phone sheet. */
-function sheetItem(app: App, current: boolean, atAppRoot: boolean): string {
-  const here = current ? ` aria-current="${atAppRoot ? 'page' : 'true'}"` : '';
-  const tag = current ? `<span class="sp-here-tag">${app.listed ? 'You are here' : 'You are here · Not listed'}</span>` : '';
+  const href = escapeHtml(app.path);
+  if (!current) return `<li><a href="${href}">${escapeHtml(app.label)}${gatedNote(app)}</a></li>`;
   return (
-    `<li><a href="${escapeHtml(app.path)}"${here}><span class="sp-name">${escapeHtml(app.label)}${lock(app)}</span>` +
-    `<span class="sp-blurb">${escapeHtml(app.blurb)}</span>${tag}</a></li>`
+    `<li><a class="sp-app" href="${href}" aria-current="${atAppRoot ? 'page' : 'true'}">` +
+    `<span class="sp-label">${escapeHtml(app.label)}</span>${gatedNote(app)}${notListed(app)}</a></li>`
   );
 }
 
-/** The app's own crumbs: links, except the last, which is the current page as plain text. */
-function tailMarkup(tail: readonly Crumb[]): string {
-  return tail
+/**
+ * The page's trail: the app's crumbs, led by the app itself (a link to its root)
+ * unless the first crumb already links there, as the atlas's "India" does. Empty
+ * at the app's root, and when that leaves a single crumb, which says nothing the
+ * row does not.
+ */
+export function trailOf(app: App, tail: readonly Crumb[]): Crumb[] {
+  if (tail.length === 0) return [];
+  const trail = tail[0].href === app.path ? [...tail] : [{ label: app.label, href: app.path }, ...tail];
+  return trail.length < 2 ? [] : trail;
+}
+
+/** The trail as a breadcrumb: links, except the last, which is the current page as plain text. */
+function trailMarkup(trail: readonly Crumb[]): string {
+  if (trail.length === 0) return '';
+  const items = trail
     .map((c, i) => {
-      const sep = '<span class="sp-sep" aria-hidden="true">/</span>';
       const label = escapeHtml(c.label);
-      const last = i === tail.length - 1;
-      const crumb = last
-        ? `<span class="sp-here sp-page" aria-current="page">${label}</span>`
-        : c.href
-          ? `<a href="${escapeHtml(c.href)}">${label}</a>`
-          : `<span class="sp-here">${label}</span>`;
-      return `<span class="sp-crumb">${sep}${crumb}</span>`;
+      if (i === trail.length - 1) return `<li><span aria-current="page">${label}</span></li>`;
+      return c.href ? `<li><a href="${escapeHtml(c.href)}">${label}</a></li>` : `<li><span>${label}</span></li>`;
     })
     .join('');
+  return `<nav class="sp-trail" aria-label="Breadcrumb"><ol>${items}</ol></nav>`;
 }
 
 /**
- * The site path for `appId`'s page, or null when the app is not in the list
- * (compose() then leaves the slot as the app wrote it). Shown: every listed app,
- * plus the current app even when it is unlisted ("Not listed").
+ * The site row and trail for `appId`'s page, or null when the app is not in the
+ * list (compose() then leaves the slot as the app wrote it). Shown: every listed
+ * app, plus the current app even when it is unlisted ("Not listed").
  */
 export function sitePathMarkup(appId: string, tail: readonly Crumb[] = [], apps: readonly App[] = APPS): string | null {
   const current = apps.find((a) => a.id === appId);
   if (!current) return null;
   const shown = apps.filter((a) => a.listed || a === current);
-  const atAppRoot = tail.length === 0;
-  const row = shown.map((a) => rowItem(a, a === current, atAppRoot)).join('');
-  const sheet = shown.map((a) => sheetItem(a, a === current, atAppRoot)).join('');
+  const row = shown.map((a) => rowItem(a, a === current, tail.length === 0)).join('');
   return (
     `<style data-site-shell>${PATH_CSS}</style>` +
-    '<nav class="sp" aria-label="Site path">' +
-    `<a class="sp-long" href="/">${SITE}${VH(' home')}</a>` +
-    `<a class="sp-short" href="/" aria-label="AP, ${SITE} home">AP</a>` +
-    '<span class="sp-sep" aria-hidden="true">/</span>' +
-    `<ul class="sp-apps">${row}</ul>` +
-    `<button type="button" class="sp-pill" commandfor="${SHEET_ID}" command="show-modal" aria-haspopup="dialog">` +
-    `${escapeHtml(current.label)}<span class="sp-chev" aria-hidden="true">⌄</span>${VH(', switch app')}</button>` +
-    tailMarkup(tail) +
-    '</nav>' +
-    `<dialog id="${SHEET_ID}" class="sp-sheet" aria-label="Apps on ${SITE}" closedby="any">` +
-    `<div class="sp-sheet-head"><a href="/">${SITE}${VH(' home')}</a>` +
-    `<button type="button" class="sp-close" commandfor="${SHEET_ID}" command="close">Close</button></div>` +
-    `<ul>${sheet}</ul></dialog>`
+    `<nav class="sp" aria-label="Site"><ul class="sp-apps">${row}</ul></nav>` +
+    trailMarkup(trailOf(current, tail))
   );
 }
 
@@ -185,7 +153,6 @@ const APPS_CSS = [
   '.site-apps-name{display:inline-flex;align-items:center;color:var(--text)}',
   '.site-apps-blurb{color:var(--text-muted)}',
   VH_CSS,
-  LOCK_CSS,
 ].join('');
 
 /** The listed apps other than the homepage, for the homepage Apps cards. */
@@ -195,7 +162,7 @@ export function siteAppsMarkup(apps: readonly App[] = APPS): string {
     .map(
       (a) =>
         `<li data-app="${escapeHtml(a.id)}"${a.gated ? ' data-gated=""' : ''}><a href="${escapeHtml(a.path)}">` +
-        `<span class="site-apps-name">${escapeHtml(a.label)}${lock(a)}</span>` +
+        `<span class="site-apps-name">${escapeHtml(a.label)}${gatedNote(a)}</span>` +
         `<span class="site-apps-blurb">${escapeHtml(a.blurb)}</span></a></li>`,
     )
     .join('');

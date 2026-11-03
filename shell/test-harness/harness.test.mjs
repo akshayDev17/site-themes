@@ -142,10 +142,10 @@ test('chat with a <site-slot name="site-path">: the slot\'s content becomes the 
   const inner = (html) => html.slice(html.indexOf(open) + open.length, html.indexOf('</site-slot>'));
   const filled = inner(body);
   assert.ok(filled.startsWith('<style data-site-shell>'), 'the slot carries its own styles');
-  assert.match(filled, /<nav class="sp" aria-label="Site path">/);
-  assert.match(filled, /<span class="sp-here sp-page" aria-current="page">Front page<\/span>/);
+  assert.match(filled, /<nav class="sp" aria-label="Site"><ul class="sp-apps">/);
   assert.match(filled, /<a class="sp-app" href="\/chat-archives" aria-current="true"><span class="sp-label">AI Digest<\/span><\/a>/);
-  assert.match(filled, /<dialog id="site-path-sheet"/);
+  assert.match(filled, /<nav class="sp-trail" aria-label="Breadcrumb"><ol><li><a href="\/chat-archives">AI Digest<\/a><\/li><li><span aria-current="page">Front page<\/span><\/li><\/ol><\/nav>/);
+  assert.ok(!filled.includes('<dialog'), 'no sheet');
   assert.ok(!filled.includes('← Akshay Prabhakant'), 'the fallback is replaced');
 
   // Outside the slot: the page as built plus the head block, byte for byte.
