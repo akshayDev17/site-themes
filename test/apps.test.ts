@@ -11,7 +11,7 @@ test('the list is valid, in the owner-approved order, and every app starts liste
     [
       ['home', 'Home', '/', false, true],
       ['chat', 'AI Digest', '/chat-archives', false, true],
-      ['quiz', 'Quiz Room', '/quiz', true, true],
+      ['quiz', 'Quiz Room', '/quiz', false, true],
       ['graph', 'Graph Notes', '/graph/', true, true],
       ['atlas', 'Election Atlas', '/elections/', false, true],
     ],

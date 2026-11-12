@@ -66,7 +66,7 @@ test('no lock anywhere: gated apps carry only a visually hidden "(sign-in requir
     }
   }
   const { row } = render(sitePathMarkup('home'));
-  assert.deepEqual(row.map(accessibleName), ['Home', 'AI Digest', `Quiz Room ${GATED}`, `Graph Notes ${GATED}`, 'Election Atlas']);
+  assert.deepEqual(row.map(accessibleName), ['Home', 'AI Digest', 'Quiz Room', `Graph Notes ${GATED}`, 'Election Atlas']);
   assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas'], 'nothing extra is drawn');
   // WCAG 2.5.3 Label in Name: the name starts with the visible label.
   for (const a of row) assert.ok(accessibleName(a).startsWith(visibleText(a)));
@@ -219,9 +219,10 @@ test('the homepage list: the listed apps other than Home, gated ones marked for 
   const doc = new JSDOM(siteAppsMarkup()).window.document;
   const items = [...doc.querySelectorAll('ul.site-apps > li')];
   assert.deepEqual(items.map((li) => li.getAttribute('data-app')), ['chat', 'quiz', 'graph', 'atlas']);
-  assert.deepEqual(items.map((li) => li.hasAttribute('data-gated')), [false, true, true, false]);
+  assert.deepEqual(items.map((li) => li.hasAttribute('data-gated')), [false, false, true, false]);
   assert.deepEqual(items.map((li) => li.querySelector('a')!.getAttribute('href')), ['/chat-archives', '/quiz', '/graph/', '/elections/']);
-  assert.ok(accessibleName(items[1].querySelector('a')!).includes(GATED));
+  assert.ok(!accessibleName(items[1].querySelector('a')!).includes(GATED), 'Quiz Room is open to signed-out visitors');
+  assert.ok(accessibleName(items[2].querySelector('a')!).includes(GATED));
 });
 
 test('the tail: escaped text, same-site links only, and anything malformed throws', () => {

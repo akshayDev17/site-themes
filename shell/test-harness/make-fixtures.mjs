@@ -1,7 +1,7 @@
 // Builds the harness apps' asset directories (git-ignored) from the HTML and CSS
 // in fixtures/ (the homepage test serves fixtures/home.html itself, as a stand-in
 // for GitHub Pages). home, chat and atlas were saved from the live public pages on
-// 2026-11-03. quiz and graph sit behind Access, so quiz.html and graph.html are
+// 2026-11-03. quiz and graph sat behind Access then, so quiz.html and graph.html are
 // the index pages of a local static build (`npm ci && npm run build` in
 // frontend/) of quiz-app 6579d3c and graph-notes f9399ec, origin/main on
 // 2026-11-03. Chat is served in two states:
