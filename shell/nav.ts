@@ -4,8 +4,7 @@
 //
 //   <site-slot name="site-path" data-tail='[{"label":"India","href":"/elections/india/"}]'>
 //     the site row, "Home  AI Digest  Quiz Room  Graph Notes  Election Atlas  Time Track",
-//     with
-//     the current app marked, and under it, on its own line, the page's trail
+//     with the current app marked, and under it, on its own line, the page's trail
 //     (a breadcrumb such as "Election Atlas › India › Uttar Pradesh") drawn from data-tail. The
 //     row sits inline wherever it fits; where it does not (a portrait phone) it
 //     scrolls sideways as one line, and site.js scrolls the current app into view
