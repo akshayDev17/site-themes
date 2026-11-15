@@ -34,6 +34,7 @@ export const APPS: readonly App[] = [
   { id: 'quiz', label: 'Quiz Room', path: '/quiz', blurb: 'Timed multiple-choice quizzes', gated: false, listed: true },
   { id: 'graph', label: 'Graph Notes', path: '/graph/', blurb: 'Personal notes as a linked graph', gated: true, listed: true },
   { id: 'atlas', label: 'Election Atlas', path: '/elections/', blurb: 'Election results by country', gated: false, listed: true },
+  { id: 'time-track', label: 'Time Track', path: '/time-track', blurb: 'Multi-timer day tracker', gated: false, listed: true },
 ];
 
 /** The same pattern compose() applies to its `app` option. */

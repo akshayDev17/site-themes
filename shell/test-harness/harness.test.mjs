@@ -326,7 +326,7 @@ test('/_site/apps.json: the listed apps from src/apps.ts, cached five minutes wi
   assert.equal(res.headers.get('etag'), etag);
   assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(await res.text(), json);
-  assert.deepEqual(JSON.parse(json).map((a) => a.id), ['home', 'chat', 'quiz', 'graph', 'atlas']);
+  assert.deepEqual(JSON.parse(json).map((a) => a.id), ['home', 'chat', 'quiz', 'graph', 'atlas', 'time-track']);
 
   for (const tag of [etag, `W/${etag}`, `"x", ${etag}`, '*']) {
     const same = await fetch(`${s.base}/_site/apps.json`, { headers: { 'if-none-match': tag } });

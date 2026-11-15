@@ -1,7 +1,7 @@
 # Uploads and deploys the site-shell Worker (shell/). A deploy also attaches its
 # two routes from shell/wrangler.jsonc: akshayprabhakant.com/_site/* (the shared
 # files) and the exact akshayprabhakant.com/ (the homepage, composed from GitHub
-# Pages). No app binds it yet.
+# Pages).
 #
 # - pull_request (this repo's branches): `wrangler versions upload` with a per-PR
 #   alias. The version is NOT deployed; it answers only at its own Version URL,
