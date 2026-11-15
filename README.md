@@ -2,8 +2,8 @@
 
 Shared themes for the akshayprabhakant.com apps (homepage, chat archive, quiz, graph notes, election atlas, time track), delivered two ways from one catalogue (`src/themes.ts`):
 
-- **The build-time package** (`dist/`, everything up to [site-shell](#site-shell)). Each app installs a pinned git tag and bundles the themes into its own build, so nothing is fetched when a page loads. Every app uses it today.
-- **site-shell** (`shell/`), a Cloudflare Worker that adds the theme and the site navigation to each app's HTML as it streams out, so one release reaches every app at its next page view. It serves the shared files at `akshayprabhakant.com/_site/*` and composes the homepage (`/`); no app binds it yet. See [site-shell](#site-shell).
+- **The build-time package** (`dist/`, everything up to [site-shell](#site-shell)). An app installs a pinned git tag and bundles the themes into its own build, so nothing is fetched when a page loads. Every app except time track uses it today.
+- **site-shell** (`shell/`), a Cloudflare Worker that adds the theme and the site navigation to each app's HTML as it streams out, so one release reaches every app at its next page view. It serves the shared files at `akshayprabhakant.com/_site/*` and composes the homepage (`/`) and the pages of the apps that bind it. See [site-shell](#site-shell).
 
 Installing the package from git still copies only `dist/` (`"files"` in `package.json`), so site-shell changes never reach an app through the package and need no tag.
 
@@ -186,7 +186,7 @@ The CSS, the boot script's id list and the picker's options all derive from the 
 
 site-shell is the shared Worker that composes the theme, and the site navigation where a page asks for it, into every app's HTML. It is built from the same catalogue, boot script and picker as the package, and from the app list (`src/apps.ts`).
 
-**Status:** it has exactly two routes, both approved by the owner: `akshayprabhakant.com/_site/*` (the shared files) and the exact `akshayprabhakant.com/` (the homepage, see [The homepage](#the-homepage)). No app binds it yet. The catch-all `akshayprabhakant.com/*` is not routed and must not be.
+**Status:** it has exactly two routes, both approved by the owner: `akshayprabhakant.com/_site/*` (the shared files) and the exact `akshayprabhakant.com/` (the homepage, see [The homepage](#the-homepage)). Four apps bind it from their own Workers: the chat archive, quiz, graph notes and time track. The catch-all `akshayprabhakant.com/*` is not routed and must not be.
 
 ### What compose() adds
 
