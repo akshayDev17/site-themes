@@ -14,13 +14,15 @@ test('the list is valid, in the owner-approved order, and every app starts liste
       ['quiz', 'Quiz Room', '/quiz', false, true],
       ['graph', 'Graph Notes', '/graph/', true, true],
       ['atlas', 'Election Atlas', '/elections/', false, true],
+      ['time-track', 'Time Track', '/time-track', false, true],
     ],
   );
 });
 
 test('every app id a Worker passes to compose() is in the list', () => {
-  // The ids the homepage route and the app Workers use (shell/worker.ts, shell/test-harness/apps/*/worker.js).
-  for (const id of ['home', 'chat', 'quiz', 'graph', 'atlas']) assert.ok(APPS.some((a) => a.id === id), id);
+  // The ids the homepage route and the app Workers use (shell/worker.ts, shell/test-harness/apps/*/worker.js;
+  // time-track's own Worker composes its pages as app=time-track).
+  for (const id of ['home', 'chat', 'quiz', 'graph', 'atlas', 'time-track']) assert.ok(APPS.some((a) => a.id === id), id);
 });
 
 test('labels are sentence case and every app has a one-line blurb', () => {

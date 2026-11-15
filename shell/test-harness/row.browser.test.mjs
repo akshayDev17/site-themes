@@ -47,6 +47,8 @@ const PAGES = {
     current: 'Election Atlas',
     head: (slot) => `${slot}<h1>Election Atlas of Uttar Pradesh</h1>`,
   },
+  // The last app in the row, at its root.
+  'time-track': { app: 'time-track', tail: [], current: 'Time Track', head: (slot) => `${slot}<h1>Time Track</h1>` },
   // A box sized by its content (an inline-block head) gives the row no width to scroll in; it must still keep to the screen.
   'content-sized': { app: 'atlas', tail: [], current: 'Election Atlas', head: (slot) => `<div style="display:inline-block">${slot}</div>` },
 };
@@ -136,7 +138,7 @@ const near = (a, b) => Math.abs(a - b) < 1;
 
 for (const theme of THEMES) {
   for (const size of Object.keys(SIZES)) {
-    for (const name of ['home', 'quiz-history', 'atlas-state']) {
+    for (const name of ['home', 'quiz-history', 'atlas-state', 'time-track']) {
       test(`${theme} ${size} ${name}: one row of 44 px targets, current app marked and in view, trail on its own line, no page overflow`, async (t) => {
         const p = await open(page(name, theme), size);
         t.after(() => p.tab.close());
@@ -145,7 +147,7 @@ for (const theme of THEMES) {
 
         assert.equal(m.theme, theme);
         assert.equal(m.locks, 0, 'no lock glyph');
-        assert.deepEqual(m.links.map((l) => l.text), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas']);
+        assert.deepEqual(m.links.map((l) => l.text), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas', 'Time Track']);
         for (const l of m.links) assert.ok(l.height >= 44 && l.width >= 44, `${l.text}: a 44 px target (${l.width}x${l.height})`);
         assert.ok(m.links.every((l) => near(l.top, m.links[0].top)), 'one line: every app on the same line');
         assert.ok(m.page.scrollWidth <= m.page.innerWidth, `no sideways page scroll: ${JSON.stringify(m.page)}`);
@@ -157,10 +159,11 @@ for (const theme of THEMES) {
 
         const fits = m.row.scrollWidth <= m.row.clientWidth;
         if (size === '390x844') {
-          assert.ok(!fits, 'on a portrait phone the five names do not fit: the row scrolls');
+          assert.ok(!fits, 'on a portrait phone the six names do not fit: the row scrolls');
           assert.ok(m.row.more, 'the edge with apps past it is marked');
           assert.notEqual(m.row.mask, 'none', 'and faded');
-          if (name === 'atlas-state') assert.match(m.row.more, /start/, 'the atlas, last in the row, is scrolled into view');
+          if (name === 'atlas-state') assert.match(m.row.more, /start/, 'the atlas, near the end of the row, is scrolled into view');
+          if (name === 'time-track') assert.equal(m.row.more, 'start', 'Time Track, last in the row, is scrolled into view: only the start is faded');
           if (name === 'home') assert.equal(m.row.more, 'end', 'on the homepage the row starts at Home');
         } else {
           assert.ok(fits, `the row sits inline where it fits (${m.row.scrollWidth} in ${m.row.clientWidth})`);
@@ -168,7 +171,7 @@ for (const theme of THEMES) {
           for (const l of m.links) assert.ok(l.right <= m.row.right + 0.5, `${l.text} is wholly visible`);
         }
 
-        if (name === 'home') assert.equal(m.trail, null, 'no trail at an app root');
+        if (name === 'home' || name === 'time-track') assert.equal(m.trail, null, 'no trail at an app root');
         else {
           assert.ok(m.trail.top >= m.row.bottom - 0.5, `the trail is under the row, not beside it: ${m.trail.top} vs ${m.row.bottom}`);
           assert.ok(m.trail.bottom - m.trail.top < 40, 'the trail is one line');

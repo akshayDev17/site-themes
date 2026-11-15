@@ -8,7 +8,7 @@ defineThemePicker();
 // The site row (shell/nav.ts) is one line that scrolls sideways where it is
 // wider than its box. Two things CSS cannot do:
 // - start it scrolled so the current app is in view (unscrolled, the last app,
-//   Election Atlas, is the one cut off), centred where it would be cut off;
+//   Time Track, is the one cut off), centred where it would be cut off;
 // - say which edges have apps past them, as data-more="start end", which the
 //   row's CSS fades so the row reads as scrollable.
 // Apps can redraw the slot after a client-side navigation, so rows are found

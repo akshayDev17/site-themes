@@ -44,11 +44,11 @@ const unlisted = (id: string): App[] => APPS.map((a) => (a.id === id ? { ...a, l
 const app = (id: string) => APPS.find((a) => a.id === id)!;
 const STATE_TAIL: Crumb[] = [{ label: 'India', href: '/elections/india/' }, { label: 'Uttar Pradesh' }];
 
-test('the site row is just the five apps, in list order, each a link to its root: no site name, no "Portfolio" crumb', () => {
+test('the site row is just the six apps, in list order, each a link to its root: no site name, no "Portfolio" crumb', () => {
   const { doc, nav, row } = render(sitePathMarkup('atlas'));
   assert.equal(nav.getAttribute('aria-label'), 'Site');
-  assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas']);
-  assert.deepEqual(row.map((a) => a.getAttribute('href')), ['/', '/chat-archives', '/quiz', '/graph/', '/elections/']);
+  assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas', 'Time Track']);
+  assert.deepEqual(row.map((a) => a.getAttribute('href')), ['/', '/chat-archives', '/quiz', '/graph/', '/elections/', '/time-track']);
   assert.equal(nav.children.length, 1, 'the row is the only thing in the site nav');
   const shown = [...doc.querySelectorAll('nav')].map((n) => n.textContent).join('');
   assert.ok(!shown.includes('akshayprabhakant.com'), 'no site name');
@@ -66,8 +66,8 @@ test('no lock anywhere: gated apps carry only a visually hidden "(sign-in requir
     }
   }
   const { row } = render(sitePathMarkup('home'));
-  assert.deepEqual(row.map(accessibleName), ['Home', 'AI Digest', 'Quiz Room', `Graph Notes ${GATED}`, 'Election Atlas']);
-  assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas'], 'nothing extra is drawn');
+  assert.deepEqual(row.map(accessibleName), ['Home', 'AI Digest', 'Quiz Room', `Graph Notes ${GATED}`, 'Election Atlas', 'Time Track']);
+  assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas', 'Time Track'], 'nothing extra is drawn');
   // WCAG 2.5.3 Label in Name: the name starts with the visible label.
   for (const a of row) assert.ok(accessibleName(a).startsWith(visibleText(a)));
 });
@@ -76,7 +76,7 @@ test('at the app root, the current app is marked aria-current="page" and there i
   const { doc, row, trail } = render(sitePathMarkup('atlas'));
   assert.equal(row[4].getAttribute('aria-current'), 'page');
   assert.equal(row[4].querySelector('.sp-label')!.textContent, 'Election Atlas');
-  for (const el of row.slice(0, 4)) assert.equal(el.getAttribute('aria-current'), null);
+  for (const el of row.filter((_, i) => i !== 4)) assert.equal(el.getAttribute('aria-current'), null);
   assert.equal(trail, null);
   assert.equal(doc.querySelectorAll('[aria-current="page"]').length, 1);
 });
@@ -90,7 +90,7 @@ test('on the homepage the row reads "Home", marked as the current page', () => {
 
 test('deeper in an app, the page name goes on its own line under the row, never into it', () => {
   const { doc, nav, row, trail, crumbs } = render(sitePathMarkup('quiz', [{ label: 'History' }]));
-  assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas'], 'the row is unchanged');
+  assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas', 'Time Track'], 'the row is unchanged');
   assert.ok(!nav.textContent!.includes('History'), 'the page name is not in the row');
   assert.equal(row[2].getAttribute('aria-current'), 'true', 'the app is the current location, not the page');
   assert.ok(trail, 'a trail');
@@ -114,6 +114,20 @@ test('Election Atlas links to /elections/ and is the current app there and on ev
   assert.deepEqual(national.crumbs.map((li) => li.textContent), ['Election Atlas', 'India']);
   assert.equal(national.crumbs[0].querySelector('a')!.getAttribute('href'), '/elections/');
   assert.equal(national.crumbs[1].firstElementChild!.getAttribute('aria-current'), 'page');
+});
+
+test('Time Track is the last app, links to /time-track and is the current app there and below it', () => {
+  const root = render(sitePathMarkup('time-track'));
+  const last = root.row[root.row.length - 1];
+  assert.equal(visibleText(last), 'Time Track');
+  assert.equal(last.getAttribute('href'), '/time-track');
+  assert.equal(last.getAttribute('aria-current'), 'page', 'at /time-track (an empty data-tail)');
+  for (const el of root.row.slice(0, -1)) assert.equal(el.getAttribute('aria-current'), null);
+  assert.equal(root.trail, null);
+  const deeper = render(sitePathMarkup('time-track', [{ label: 'History' }]));
+  assert.equal(deeper.row[deeper.row.length - 1].getAttribute('aria-current'), 'true', 'below the root');
+  assert.deepEqual(deeper.crumbs.map((li) => li.textContent), ['Time Track', 'History']);
+  assert.equal(deeper.crumbs[0].querySelector('a')!.getAttribute('href'), '/time-track');
 });
 
 test('the atlas trail is led by the app: "Election Atlas › India › Uttar Pradesh"', () => {
@@ -154,20 +168,20 @@ test('listed:false: the app says "Not listed" on its own row and is absent from 
   assert.equal(isUnlisted('nope', apps), false);
 
   const own = render(sitePathMarkup('graph', [], apps));
-  assert.equal(own.row.length, 5);
+  assert.equal(own.row.length, 6);
   assert.equal(accessibleName(own.row[3]), `Graph Notes ${GATED}, Not listed`);
   assert.equal(own.row[3].getAttribute('aria-current'), 'page');
 
-  for (const id of ['home', 'chat', 'quiz', 'atlas']) {
+  for (const id of ['home', 'chat', 'quiz', 'atlas', 'time-track']) {
     const other = render(sitePathMarkup(id, [], apps));
-    assert.equal(other.row.length, 4, id);
+    assert.equal(other.row.length, 5, id);
     assert.equal(other.doc.querySelector('[href="/graph/"]'), null, id);
     assert.ok(!other.doc.body.textContent!.includes('Graph Notes'), id);
     assert.ok(!other.doc.body.textContent!.includes('Not listed'), id);
   }
   const list = new JSDOM(siteAppsMarkup(apps)).window.document;
-  assert.deepEqual([...list.querySelectorAll('li')].map((li) => li.getAttribute('data-app')), ['chat', 'quiz', 'atlas']);
-  assert.deepEqual(JSON.parse(listedAppsJson(apps)).map((a: App) => a.id), ['home', 'chat', 'quiz', 'atlas'], '/_site/apps.json leaves it out too');
+  assert.deepEqual([...list.querySelectorAll('li')].map((li) => li.getAttribute('data-app')), ['chat', 'quiz', 'atlas', 'time-track']);
+  assert.deepEqual(JSON.parse(listedAppsJson(apps)).map((a: App) => a.id), ['home', 'chat', 'quiz', 'atlas', 'time-track'], '/_site/apps.json leaves it out too');
 });
 
 test('/_site/apps.json: every listed app in list order, with exactly what the Apps cards render', () => {
@@ -175,7 +189,7 @@ test('/_site/apps.json: every listed app in list order, with exactly what the Ap
     JSON.parse(listedAppsJson()),
     APPS.map(({ id, label, path, blurb, gated }) => ({ id, label, path, blurb, gated })),
   );
-  assert.deepEqual(JSON.parse(listedAppsJson()).map((a: App) => a.id), ['home', 'chat', 'quiz', 'graph', 'atlas']);
+  assert.deepEqual(JSON.parse(listedAppsJson()).map((a: App) => a.id), ['home', 'chat', 'quiz', 'graph', 'atlas', 'time-track']);
 });
 
 test('the slot styles: Newsreader in sentence case, 44 px row targets, one line that scrolls rather than wraps', () => {
@@ -218,9 +232,9 @@ test('the slot styles: Newsreader in sentence case, 44 px row targets, one line 
 test('the homepage list: the listed apps other than Home, gated ones marked for screen readers only', () => {
   const doc = new JSDOM(siteAppsMarkup()).window.document;
   const items = [...doc.querySelectorAll('ul.site-apps > li')];
-  assert.deepEqual(items.map((li) => li.getAttribute('data-app')), ['chat', 'quiz', 'graph', 'atlas']);
-  assert.deepEqual(items.map((li) => li.hasAttribute('data-gated')), [false, false, true, false]);
-  assert.deepEqual(items.map((li) => li.querySelector('a')!.getAttribute('href')), ['/chat-archives', '/quiz', '/graph/', '/elections/']);
+  assert.deepEqual(items.map((li) => li.getAttribute('data-app')), ['chat', 'quiz', 'graph', 'atlas', 'time-track']);
+  assert.deepEqual(items.map((li) => li.hasAttribute('data-gated')), [false, false, true, false, false]);
+  assert.deepEqual(items.map((li) => li.querySelector('a')!.getAttribute('href')), ['/chat-archives', '/quiz', '/graph/', '/elections/', '/time-track']);
   assert.ok(!accessibleName(items[1].querySelector('a')!).includes(GATED), 'Quiz Room is open to signed-out visitors');
   assert.ok(accessibleName(items[2].querySelector('a')!).includes(GATED));
 });
