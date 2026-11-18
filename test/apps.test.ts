@@ -12,7 +12,7 @@ test('the list is valid, in the owner-approved order, and every app starts liste
       ['home', 'Home', '/', false, true],
       ['chat', 'AI Digest', '/chat-archives', false, true],
       ['quiz', 'Quiz Room', '/quiz', false, true],
-      ['graph', 'Graph Notes', '/graph/', true, true],
+      ['graph', 'Graph Notes', '/graph/', false, true],
       ['atlas', 'Election Atlas', '/elections/', false, true],
       ['time-track', 'Time Track', '/time-track', false, true],
     ],

@@ -41,6 +41,8 @@ const visibleText = (el: Element): string =>
     .trim();
 
 const unlisted = (id: string): App[] => APPS.map((a) => (a.id === id ? { ...a, listed: false } : a));
+// No real app is gated today, so the gated tests mark one by hand.
+const gated = (id: string): App[] => APPS.map((a) => (a.id === id ? { ...a, gated: true } : a));
 const app = (id: string) => APPS.find((a) => a.id === id)!;
 const STATE_TAIL: Crumb[] = [{ label: 'India', href: '/elections/india/' }, { label: 'Uttar Pradesh' }];
 
@@ -57,7 +59,8 @@ test('the site row is just the six apps, in list order, each a link to its root:
 });
 
 test('no lock anywhere: gated apps carry only a visually hidden "(sign-in required)"', () => {
-  for (const html of [sitePathMarkup('home'), sitePathMarkup('quiz', [{ label: 'History' }]), siteAppsMarkup()]) {
+  const apps = gated('graph');
+  for (const html of [sitePathMarkup('home', [], apps), sitePathMarkup('quiz', [{ label: 'History' }], apps), siteAppsMarkup(apps)]) {
     const doc = new JSDOM(`<!doctype html><body>${html}</body>`).window.document;
     assert.equal(doc.querySelectorAll('svg, .site-lock').length, 0, 'no lock glyph');
     assert.ok(!/site-lock|<svg|🔒/.test(html!), 'no lock in the markup or its CSS');
@@ -65,8 +68,10 @@ test('no lock anywhere: gated apps carry only a visually hidden "(sign-in requir
       if (vh.textContent!.includes('sign-in')) assert.equal(vh.textContent, ' (sign-in required)');
     }
   }
-  const { row } = render(sitePathMarkup('home'));
+  const { row } = render(sitePathMarkup('home', [], apps));
   assert.deepEqual(row.map(accessibleName), ['Home', 'AI Digest', 'Quiz Room', `Graph Notes ${GATED}`, 'Election Atlas', 'Time Track']);
+  const real = render(sitePathMarkup('home'));
+  assert.deepEqual(real.row.map(accessibleName), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas', 'Time Track'], 'no app is gated today');
   assert.deepEqual(row.map(visibleText), ['Home', 'AI Digest', 'Quiz Room', 'Graph Notes', 'Election Atlas', 'Time Track'], 'nothing extra is drawn');
   // WCAG 2.5.3 Label in Name: the name starts with the visible label.
   for (const a of row) assert.ok(accessibleName(a).startsWith(visibleText(a)));
@@ -169,7 +174,7 @@ test('listed:false: the app says "Not listed" on its own row and is absent from 
 
   const own = render(sitePathMarkup('graph', [], apps));
   assert.equal(own.row.length, 6);
-  assert.equal(accessibleName(own.row[3]), `Graph Notes ${GATED}, Not listed`);
+  assert.equal(accessibleName(own.row[3]), 'Graph Notes, Not listed');
   assert.equal(own.row[3].getAttribute('aria-current'), 'page');
 
   for (const id of ['home', 'chat', 'quiz', 'atlas', 'time-track']) {
@@ -230,13 +235,16 @@ test('the slot styles: Newsreader in sentence case, 44 px row targets, one line 
 });
 
 test('the homepage list: the listed apps other than Home, gated ones marked for screen readers only', () => {
-  const doc = new JSDOM(siteAppsMarkup()).window.document;
-  const items = [...doc.querySelectorAll('ul.site-apps > li')];
-  assert.deepEqual(items.map((li) => li.getAttribute('data-app')), ['chat', 'quiz', 'graph', 'atlas', 'time-track']);
+  const real = [...new JSDOM(siteAppsMarkup()).window.document.querySelectorAll('ul.site-apps > li')];
+  assert.deepEqual(real.map((li) => li.getAttribute('data-app')), ['chat', 'quiz', 'graph', 'atlas', 'time-track']);
+  assert.deepEqual(real.map((li) => li.hasAttribute('data-gated')), [false, false, false, false, false], 'no app is gated today');
+  assert.deepEqual(real.map((li) => li.querySelector('a')!.getAttribute('href')), ['/chat-archives', '/quiz', '/graph/', '/elections/', '/time-track']);
+  for (const li of real) assert.ok(!accessibleName(li.querySelector('a')!).includes(GATED), li.getAttribute('data-app')!);
+
+  const items = [...new JSDOM(siteAppsMarkup(gated('graph'))).window.document.querySelectorAll('ul.site-apps > li')];
   assert.deepEqual(items.map((li) => li.hasAttribute('data-gated')), [false, false, true, false, false]);
-  assert.deepEqual(items.map((li) => li.querySelector('a')!.getAttribute('href')), ['/chat-archives', '/quiz', '/graph/', '/elections/', '/time-track']);
-  assert.ok(!accessibleName(items[1].querySelector('a')!).includes(GATED), 'Quiz Room is open to signed-out visitors');
   assert.ok(accessibleName(items[2].querySelector('a')!).includes(GATED));
+  assert.ok(!accessibleName(items[1].querySelector('a')!).includes(GATED));
 });
 
 test('the tail: escaped text, same-site links only, and anything malformed throws', () => {

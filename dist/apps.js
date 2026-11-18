@@ -15,7 +15,7 @@ export const APPS = [
     { id: HOME_ID, label: 'Home', path: '/', blurb: 'Work, research and contact', gated: false, listed: true },
     { id: 'chat', label: 'AI Digest', path: '/chat-archives', blurb: 'AI chat sessions filed as a newspaper', gated: false, listed: true },
     { id: 'quiz', label: 'Quiz Room', path: '/quiz', blurb: 'Timed multiple-choice quizzes', gated: false, listed: true },
-    { id: 'graph', label: 'Graph Notes', path: '/graph/', blurb: 'Personal notes as a linked graph', gated: true, listed: true },
+    { id: 'graph', label: 'Graph Notes', path: '/graph/', blurb: 'Personal notes as a linked graph', gated: false, listed: true },
     { id: 'atlas', label: 'Election Atlas', path: '/elections/', blurb: 'Election results by country', gated: false, listed: true },
     { id: 'time-track', label: 'Time Track', path: '/time-track', blurb: 'Multi-timer day tracker', gated: false, listed: true },
 ];
